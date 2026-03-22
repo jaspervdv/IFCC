@@ -39,17 +39,43 @@ struct PropertyKey
 struct PropertyKeyHash
 {
 	template <typename IfcSchema>
-	std::size_t operator()(const PropertyKey<IfcSchema>& k) const
+	size_t operator()(const PropertyKey<IfcSchema>& k) const
 	{
-		std::size_t h1 = std::hash<std::string>{}(k.name);
-		std::size_t h2 = std::hash<std::string>{}(k.value);
-		std::size_t h3 = std::hash<void*>{}(k.unit);
-		std::size_t h4 = k.description ? std::hash<std::string>{}(*k.description) : 0;
+		size_t h1 = std::hash<std::string>{}(k.name);
+		size_t h2 = std::hash<std::string>{}(k.value);
+		size_t h3 = std::hash<void*>{}(k.unit);
+		size_t h4 = k.description ? std::hash<std::string>{}(*k.description) : 0;
 
 		size_t hash = h1;
 		hash ^= h2 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
 		hash ^= h3 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
 		hash ^= h4 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+		return hash;
+	}
+};
+
+struct IntPoint
+{
+	int x;
+	int y;
+	int z;
+
+	bool operator==(const IntPoint& other) const {
+		return x == other.x && y == other.y && z == other.z;
+	}
+};
+
+struct IntPointHash
+{
+	size_t operator()(const IntPoint& p) const
+	{
+		size_t h1 = std::hash<int>{}(p.x);
+		size_t h2 = std::hash<int>{}(p.y);
+		size_t h3 = std::hash<int>{}(p.z);
+
+		size_t hash = h1;
+		hash ^= h2 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+		hash ^= h3 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
 		return hash;
 	}
 };
@@ -262,6 +288,7 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 	int pointListSize = pointList->size();
 	int currentItemCount = 0;
 
+	std::unordered_map<IntPoint, IfcSchema::IfcCartesianPoint*, IntPointHash> processedItems;
 	std::vector<int> toBeEliminatedObjectIDs;
 
 	for (auto currentPointIt = pointList->begin(); currentPointIt != pointList->end(); ++currentPointIt)
@@ -273,108 +300,102 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 		currentItemCount++;
 
 		IfcSchema::IfcCartesianPoint* currentPoint = *currentPointIt;
-		auto searchIt = find(toBeEliminatedObjectIDs.begin(), toBeEliminatedObjectIDs.end(), currentPoint->data().id());
-		if (searchIt != toBeEliminatedObjectIDs.end()) { continue; }	
-
-		// Check if the target value was found
 		std::vector<double> currentCoords = currentPoint->Coordinates();
 
-		for (auto otherPointIt = currentPointIt; otherPointIt != pointList->end(); ++otherPointIt) //TODO: speed this up like the properties
+		IntPoint roundedPoint{
+			static_cast<int>(std::round(currentCoords[0] / scale)),
+			static_cast<int>(std::round(currentCoords[1] / scale)),
+			static_cast<int>(std::round(currentCoords[2] / scale))
+		};
+
+		auto [storedPoint, inserted] = processedItems.emplace(roundedPoint, currentPoint);
+		if (inserted) { continue; }
+
+		IfcSchema::IfcCartesianPoint* uniquePoint = storedPoint->second;
+		auto aggregateList = theFile->instances_by_reference(currentPoint->data().id());
+
+		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
 		{
-			if (currentPointIt == otherPointIt) { continue; }
-			IfcSchema::IfcCartesianPoint* otherPoint = *otherPointIt;
-			std::vector<double> otherCoords = otherPoint->Coordinates();
+			IfcUtil::IfcBaseClass* referenceObject = *agregateIt;
+			std::string objectTypeName = referenceObject->declaration().name();
 
-			if (abs(currentCoords[0] - otherCoords[0]) > scale) { continue; }
-			if (abs(currentCoords[1] - otherCoords[1]) > scale) { continue; }
-			if (abs(currentCoords[2] - otherCoords[2]) > scale) { continue; }
-
-			//std::cout << otherPoint->data().toString() << std::endl;
-			aggregate_of_instance::ptr referencedObjects = theFile->instances_by_reference(otherPoint->data().id());
-
-			for (auto referencedObjectIt = referencedObjects->begin(); referencedObjectIt != referencedObjects->end(); ++referencedObjectIt)
+			if (objectTypeName == "IfcAxis2Placement2D")
 			{
-				IfcUtil::IfcBaseClass* referenceObject = *referencedObjectIt;
-				std::string objectTypeName = referenceObject->declaration().name();
-
-				if (objectTypeName == "IfcAxis2Placement2D")
-				{
-					IfcSchema::IfcAxis2Placement2D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement2D>();
-					if (placementObject == nullptr) { continue; }
-					placementObject->setLocation(currentPoint);
-					toBeEliminatedObjectIDs.emplace_back(otherPoint->data().id());
-					continue;
-				}
-				if (objectTypeName == "IfcAxis2Placement3D")
-				{
-					IfcSchema::IfcAxis2Placement3D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement3D>();
-					if (placementObject == nullptr) { continue; }
-					placementObject->setLocation(currentPoint);
-					toBeEliminatedObjectIDs.emplace_back(otherPoint->data().id());
-					continue;
-				}
-				if (objectTypeName == "IfcBoundingBox")
-				{
-					IfcSchema::IfcBoundingBox* bBoxObject = referenceObject->as<IfcSchema::IfcBoundingBox>();
-					if (bBoxObject == nullptr) { continue; }
-					bBoxObject->setCorner(currentPoint);
-					toBeEliminatedObjectIDs.emplace_back(otherPoint->data().id());
-					continue;
-				}
-				if (objectTypeName == "IfcCartesianTransformationOperator3D")
-				{
-					IfcSchema::IfcCartesianTransformationOperator3D* transformatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator3D>();
-					if (transformatorObject == nullptr) { continue; }
-					transformatorObject->setLocalOrigin(currentPoint);
-					toBeEliminatedObjectIDs.emplace_back(otherPoint->data().id());
-					continue;
-				}
-				if (objectTypeName == "IfcPolyline")
-				{
-					IfcSchema::IfcPolyline* polyLineObject = referenceObject->as<IfcSchema::IfcPolyline>();
-					if (polyLineObject == nullptr) { continue; }
-
-					IfcSchema::IfcCartesianPoint::list::ptr pointList =  polyLineObject->Points();
-					IfcSchema::IfcCartesianPoint::list::ptr newPointList =  boost::make_shared< IfcSchema::IfcCartesianPoint::list>();
-
-					for (auto loopPointIt = pointList->begin(); loopPointIt != pointList->end(); ++ loopPointIt )
-					{
-						IfcSchema::IfcCartesianPoint* loopPoint = *loopPointIt;
-						if (loopPoint->data().id() == otherPoint->data().id())
-						{
-							newPointList->push(currentPoint);
-							continue;
-						}
-						newPointList->push(loopPoint);
-					}
-					polyLineObject->setPoints(newPointList);
-					toBeEliminatedObjectIDs.emplace_back(otherPoint->data().id());
-					continue;
-				}
-				if (objectTypeName == "IfcPolyLoop")
-				{
-					IfcSchema::IfcPolyLoop* polyLineObject = referenceObject->as<IfcSchema::IfcPolyLoop>();
-					if (polyLineObject == nullptr) { continue; }
-
-					IfcSchema::IfcCartesianPoint::list::ptr pointList = polyLineObject->Polygon();
-					IfcSchema::IfcCartesianPoint::list::ptr newPointList = boost::make_shared< IfcSchema::IfcCartesianPoint::list>();
-
-					for (auto loopPointIt = pointList->begin(); loopPointIt != pointList->end(); ++loopPointIt)
-					{
-						IfcSchema::IfcCartesianPoint* loopPoint = *loopPointIt;
-						if (loopPoint->data().id() == otherPoint->data().id())
-						{
-							newPointList->push(currentPoint);
-							continue;
-						}
-						newPointList->push(loopPoint);
-					}
-					polyLineObject->setPolygon(newPointList);
-					toBeEliminatedObjectIDs.emplace_back(otherPoint->data().id());
-					continue;
-				}
-				std::cout << (*referencedObjectIt)->declaration().name() << std::endl;
+				IfcSchema::IfcAxis2Placement2D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement2D>();
+				if (placementObject == nullptr) { continue; }
+				placementObject->setLocation(uniquePoint);
+				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				continue;
 			}
+			if (objectTypeName == "IfcAxis2Placement3D")
+			{
+				IfcSchema::IfcAxis2Placement3D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement3D>();
+				if (placementObject == nullptr) { continue; }
+				placementObject->setLocation(uniquePoint);
+				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				continue;
+			}
+			if (objectTypeName == "IfcBoundingBox")
+			{
+				IfcSchema::IfcBoundingBox* bBoxObject = referenceObject->as<IfcSchema::IfcBoundingBox>();
+				if (bBoxObject == nullptr) { continue; }
+				bBoxObject->setCorner(uniquePoint);
+				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				continue;
+			}
+			if (objectTypeName == "IfcCartesianTransformationOperator3D")
+			{
+				IfcSchema::IfcCartesianTransformationOperator3D* transformatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator3D>();
+				if (transformatorObject == nullptr) { continue; }
+				transformatorObject->setLocalOrigin(uniquePoint);
+				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				continue;
+			}
+			if (objectTypeName == "IfcPolyline")
+			{
+				IfcSchema::IfcPolyline* polyLineObject = referenceObject->as<IfcSchema::IfcPolyline>();
+				if (polyLineObject == nullptr) { continue; }
+
+				IfcSchema::IfcCartesianPoint::list::ptr pointList = polyLineObject->Points();
+				IfcSchema::IfcCartesianPoint::list::ptr newPointList = boost::make_shared< IfcSchema::IfcCartesianPoint::list>();
+
+				for (auto loopPointIt = pointList->begin(); loopPointIt != pointList->end(); ++loopPointIt)
+				{
+					IfcSchema::IfcCartesianPoint* loopPoint = *loopPointIt;
+					if (loopPoint->data().id() == currentPoint->data().id())
+					{
+						newPointList->push(uniquePoint);
+						continue;
+					}
+					newPointList->push(loopPoint);
+				}
+				polyLineObject->setPoints(newPointList);
+				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				continue;
+			}
+			if (objectTypeName == "IfcPolyLoop")
+			{
+				IfcSchema::IfcPolyLoop* polyLineObject = referenceObject->as<IfcSchema::IfcPolyLoop>();
+				if (polyLineObject == nullptr) { continue; }
+
+				IfcSchema::IfcCartesianPoint::list::ptr pointList = polyLineObject->Polygon();
+				IfcSchema::IfcCartesianPoint::list::ptr newPointList = boost::make_shared< IfcSchema::IfcCartesianPoint::list>();
+
+				for (auto loopPointIt = pointList->begin(); loopPointIt != pointList->end(); ++loopPointIt)
+				{
+					IfcSchema::IfcCartesianPoint* loopPoint = *loopPointIt;
+					if (loopPoint->data().id() == currentPoint->data().id())
+					{
+						newPointList->push(uniquePoint);
+						continue;
+					}
+					newPointList->push(loopPoint);
+				}
+				polyLineObject->setPolygon(newPointList);
+				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				continue;
+			}
+			std::cout << referenceObject->declaration().name() << std::endl;
 		}
 	}
 	std::cout << currentItemCount << " of " << pointListSize << " objects\n";
