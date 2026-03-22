@@ -463,6 +463,97 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 	return theFile;
 }
 
+template <typename IfcSchema>
+std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize)
+{
+	std::cout << "[INFO] removing dubplicate/redundant direction objects\n";
+	IfcSchema::IfcDirection::list::ptr directionList = theFile->instances_by_type<IfcSchema::IfcDirection>();
+
+	double scale = pow(10, floatingPointSize - 1);
+	int dirListSize = directionList->size();
+	int currentItemCount = 0;
+
+	std::unordered_map<IntPoint, IfcSchema::IfcDirection*, IntPointHash> processedItems;
+	std::vector<int> toBeEliminatedObjectIDs;
+
+	for (auto currentPointIt = directionList->begin(); currentPointIt != directionList->end(); ++currentPointIt)
+	{
+		if (currentItemCount % 100 == 0)
+		{
+			std::cout << currentItemCount << " of " << dirListSize << " objects\r";
+		}
+		currentItemCount++;
+
+		IfcSchema::IfcDirection* currentDir = *currentPointIt;
+		std::vector<double> currentCoords = currentDir->DirectionRatios();
+
+		IntPoint roundedPoint = (currentCoords.size() == 2)
+			? IntPoint{
+				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
+				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
+				0,
+				false
+		}
+			: IntPoint{
+				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
+				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
+				static_cast<int64_t>(std::round(currentCoords[2] * scale)),
+				true
+		};
+
+		auto [storedDir, inserted] = processedItems.emplace(roundedPoint, currentDir);
+		if (inserted) { continue; }
+
+		IfcSchema::IfcDirection* uniqueDir = storedDir->second;
+		auto aggregateList = theFile->instances_by_reference(currentDir->data().id());
+
+		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
+		{
+			IfcUtil::IfcBaseClass* referenceObject = *agregateIt;
+			std::string objectTypeName = referenceObject->declaration().name();
+
+			if (objectTypeName == "IfcAxis2Placement2D")
+			{
+				IfcSchema::IfcAxis2Placement2D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement2D>();
+				if (placementObject == nullptr) { continue; }
+				placementObject->setRefDirection(uniqueDir);
+				continue;
+			}
+			if (objectTypeName == "IfcAxis2Placement3D")
+			{
+				IfcSchema::IfcAxis2Placement3D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement3D>();
+				if (placementObject == nullptr) { continue; }
+				if (placementObject->Axis() == currentDir) { placementObject->setAxis(uniqueDir); }
+				else if (placementObject->RefDirection() == currentDir) { placementObject->setRefDirection(uniqueDir); }
+				continue;
+			}
+			if (objectTypeName == "IfcCartesianTransformationOperator3D")
+			{
+				continue;
+			}
+			if (objectTypeName == "IfcExtrudedAreaSolid")
+			{
+				continue;
+			}	
+			if (objectTypeName == "IfcGeometricRepresentationContext")
+			{
+				continue;
+			}
+
+		}
+		auto refs = theFile->instances_by_reference(currentDir->data().id());
+		if (refs->size() != 0) {
+			continue;
+		}
+		toBeEliminatedObjectIDs.emplace_back(currentDir->data().id());
+	}
+	std::cout << currentItemCount << " of " << dirListSize << " objects\n";
+
+	// delete the dubs that are dangling
+	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeEliminatedObjectIDs);
+	return theFile;
+}
+
 bool isValidIfcFile(const std::filesystem::path& filePath)
 {
 	if (!std::filesystem::exists(filePath)) { return false; } 
@@ -527,6 +618,7 @@ std::unique_ptr<IfcParse::IfcFile> processFile(std::unique_ptr<IfcParse::IfcFile
 	theFile = collapseProperties<IfcSchema>(std::move(theFile), pathToFile);
 	roundFloats<IfcSchema>(theFile.get(), floatingPointSize);
 	theFile = collapsePoints<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize);
+	theFile = collapseDirections<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize);
 	return theFile;
 }
 
