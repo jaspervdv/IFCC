@@ -226,14 +226,12 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 		IfcSchema::IfcPropertySingleValue* uniquePropertyValue = storedPropertyKey->second;
 		auto aggregateList = theFile->instances_by_reference(currentPropertyValue->data().id());
 
-		int dereferenced = 0;
 		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
 		{
 			IfcUtil::IfcBaseClass* currentPropertySetBase = *agregateIt;
 
 			if (currentPropertySetBase->data().type()->name() != "IfcPropertySet")
 			{
-				//std::cout << currentPropertySetBase->data().toString() << std::endl;
 				continue;
 			}
 
@@ -252,14 +250,13 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 				newPropertyList->push(ttt);
 			}
 			currentPropertySet->setHasProperties(newPropertyList);
-			dereferenced++;
 		}
 
-		if (dereferenced != aggregateList->size())
-		{
-			//std::cout << currentPropertyValue->data().toString() << std::endl;
+		auto refs = theFile->instances_by_reference(currentPropertyValue->data().id());
+		if (refs->size() != 0) {
 			continue;
 		}
+
 		toBeEliminatedPropertyValuesId.emplace_back(currentPropertyValue->data().id());
 	}
 
@@ -323,17 +320,18 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 		IfcSchema::IfcCartesianPoint* currentPoint = *currentPointIt;
 		std::vector<double> currentCoords = currentPoint->Coordinates();
 
-		bool is3D = true;
-		if (currentCoords.size() == 2)
-		{
-			is3D = false;
+		IntPoint roundedPoint = (currentCoords.size() == 2)
+			? IntPoint{
+				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
+				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
+				0,
+				false
 		}
-
-		IntPoint roundedPoint{
-			static_cast<int64_t>(std::round(currentCoords[0] * scale)),
-			static_cast<int64_t>(std::round(currentCoords[1] * scale)),
-			static_cast<int64_t>(std::round(currentCoords[2] * scale)),
-			is3D
+			: IntPoint{
+				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
+				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
+				static_cast<int64_t>(std::round(currentCoords[2] * scale)),
+				true
 		};
 
 		auto [storedPoint, inserted] = processedItems.emplace(roundedPoint, currentPoint);
