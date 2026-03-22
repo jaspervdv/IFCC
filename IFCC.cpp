@@ -527,16 +527,35 @@ std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::
 				else if (placementObject->RefDirection() == currentDir) { placementObject->setRefDirection(uniqueDir); }
 				continue;
 			}
+			if (objectTypeName == "IfcCartesianTransformationOperator2D")
+			{
+				IfcSchema::IfcCartesianTransformationOperator2D* operatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator2D>();
+				if (operatorObject == nullptr) { continue; }
+				if (operatorObject->Axis1() == currentDir) { operatorObject->setAxis1(uniqueDir); }
+				if (operatorObject->Axis2() == currentDir) { operatorObject->setAxis2(uniqueDir); }
+				continue;
+			}
 			if (objectTypeName == "IfcCartesianTransformationOperator3D")
 			{
+				IfcSchema::IfcCartesianTransformationOperator3D* operatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator3D>();
+				if (operatorObject == nullptr) { continue; }
+				if (operatorObject->Axis1() == currentDir) { operatorObject->setAxis1(uniqueDir); }
+				if (operatorObject->Axis2() == currentDir) { operatorObject->setAxis2(uniqueDir); }
+				if (operatorObject->Axis3() == currentDir) { operatorObject->setAxis3(uniqueDir); }
 				continue;
 			}
 			if (objectTypeName == "IfcExtrudedAreaSolid")
 			{
+				IfcSchema::IfcExtrudedAreaSolid* extrusionObject = referenceObject->as<IfcSchema::IfcExtrudedAreaSolid>();
+				if (extrusionObject == nullptr) { continue; }
+				extrusionObject->setExtrudedDirection(uniqueDir);
 				continue;
 			}	
 			if (objectTypeName == "IfcGeometricRepresentationContext")
 			{
+				IfcSchema::IfcGeometricRepresentationContext* repObject = referenceObject->as<IfcSchema::IfcGeometricRepresentationContext>();
+				if (repObject == nullptr) { continue; }
+				repObject->setTrueNorth(uniqueDir);
 				continue;
 			}
 
@@ -619,6 +638,8 @@ std::unique_ptr<IfcParse::IfcFile> processFile(std::unique_ptr<IfcParse::IfcFile
 	roundFloats<IfcSchema>(theFile.get(), floatingPointSize);
 	theFile = collapsePoints<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize);
 	theFile = collapseDirections<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize);
+
+	//TODO: centralize the object delete process
 	return theFile;
 }
 
