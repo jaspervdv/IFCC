@@ -18,6 +18,7 @@
 #include <ifcparse/IfcHierarchyHelper.h>
 
 #include <boost/make_shared.hpp>
+#include <boost/optional/optional_io.hpp>
 
 template <typename IfcSchema>
 struct PropertyKey
@@ -155,6 +156,20 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 	return theFile;
 }
 
+template <typename T>
+boost::optional<std::string> getDescription(T* prop) {
+	if constexpr (std::is_same_v<T, Ifc2x3::IfcPropertySingleValue> ||
+		std::is_same_v<T, Ifc4::IfcPropertySingleValue> ||
+		std::is_same_v<T, Ifc4x1::IfcPropertySingleValue> ||
+		std::is_same_v<T, Ifc4x2::IfcPropertySingleValue>)
+	{
+		return prop->Description();
+	}
+	else {
+		return boost::none;
+	}
+}
+
 template <typename IfcSchema>
 std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile)
 {
@@ -181,21 +196,11 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 		IfcSchema::IfcPropertySingleValue* currentPropertyValue = *globalPropertyIt;
 		if (currentPropertyValue == nullptr) { continue; }
 
-		//std::ostringstream nominalValueOs;
-		//currentPropertyValue->NominalValue()->data().toString(nullptr, nullptr, 0, nominalValueOs);
-
-		/*PropertyKey key{
-		currentPropertyValue->Name(),
-		nominalValueOs.str(),
-		currentPropertyValue->Unit(),
-		currentPropertyValue->Description()
-		};*/
-
 		PropertyKey<IfcSchema> key{
 		currentPropertyValue->Name(),
 		currentPropertyValue->NominalValue()->data().toString(),
 		currentPropertyValue->Unit(),
-		currentPropertyValue->Description()
+		getDescription(currentPropertyValue)
 		};
 
 		// check if dub and store the unique data
@@ -503,9 +508,9 @@ int main(int argc, char* argv[])
 	else if (currentIfcVersion == "IFC4") { ifcFile = processFile<Ifc4>(std::move(ifcFile), filePath, precisionPoint); }
 	else if (currentIfcVersion == "IFC4X1") { ifcFile = processFile<Ifc4x1>(std::move(ifcFile), filePath, precisionPoint); }
 	else if (currentIfcVersion == "IFC4X2") { ifcFile = processFile<Ifc4x2>(std::move(ifcFile), filePath, precisionPoint); }
-	//else if (currentIfcVersion == "IFC4X3") { ifcFile = processFile<Ifc4x3>(std::move(ifcFile), filePath, precisionPoint); }
-	//else if (currentIfcVersion == "IFC4X3_ADD1") { ifcFile = processFile<Ifc4x3_add1>(std::move(ifcFile), filePath, precisionPoint); }
-	//else if (currentIfcVersion == "IFC4X3_ADD2") { ifcFile = processFile<Ifc4x3_add2>(std::move(ifcFile), filePath, precisionPoint); }
+	else if (currentIfcVersion == "IFC4X3") { ifcFile = processFile<Ifc4x3>(std::move(ifcFile), filePath, precisionPoint); }
+	else if (currentIfcVersion == "IFC4X3_ADD1") { ifcFile = processFile<Ifc4x3_add1>(std::move(ifcFile), filePath, precisionPoint); }
+	else if (currentIfcVersion == "IFC4X3_ADD2") { ifcFile = processFile<Ifc4x3_add2>(std::move(ifcFile), filePath, precisionPoint); }
 	else
 	{
 		std::cout << "Ifc version is not (yet) supported: " << currentIfcVersion << "\n";
