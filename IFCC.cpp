@@ -57,12 +57,15 @@ struct PropertyKeyHash
 
 struct IntPoint
 {
-	int x;
-	int y;
-	int z;
+	int64_t x;
+	int64_t y;
+	int64_t z;
+	bool is3D;
 
 	bool operator==(const IntPoint& other) const {
-		return x == other.x && y == other.y && z == other.z;
+		if (is3D != other.is3D) { return false; }
+		if (is3D) { return x == other.x && y == other.y && z == other.z; }
+		return x == other.x && y == other.y;
 	}
 };
 
@@ -70,9 +73,9 @@ struct IntPointHash
 {
 	size_t operator()(const IntPoint& p) const
 	{
-		size_t h1 = std::hash<int>{}(p.x);
-		size_t h2 = std::hash<int>{}(p.y);
-		size_t h3 = std::hash<int>{}(p.z);
+		size_t h1 = std::hash<int64_t>{}(p.x);
+		size_t h2 = std::hash<int64_t>{}(p.y);
+		size_t h3 = std::hash<int64_t>{}(p.z);
 
 		size_t hash = h1;
 		hash ^= h2 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
@@ -83,6 +86,16 @@ struct IntPointHash
 
 std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::IfcFile> theFile, std::filesystem::path pathToFile, std::vector<int> toBeDeletedIdist)
 {
+	if (toBeDeletedIdist.empty()) 
+	{
+		std::cout << "no objects to delete" << std::endl; 
+		return theFile;
+	}
+
+	std::sort(toBeDeletedIdist.begin(), toBeDeletedIdist.end());
+	auto last = std::unique(toBeDeletedIdist.begin(), toBeDeletedIdist.end());
+	toBeDeletedIdist.erase(last, toBeDeletedIdist.end());
+
 	// store the data to the temp file path
 	std::cout << "storing updated References\n";
 
@@ -129,7 +142,10 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 				ignore = true;
 
 				delCount++;
-				std::cout << delCount << " objects removed from file\r";
+				if (delCount % 100 == 0)
+				{
+					std::cout << delCount << " objects removed from file\r";
+				}
 				break;
 			}
 			if (!ignore)
@@ -166,7 +182,7 @@ boost::optional<std::string> getDescription(T* prop) {
 		return prop->Description();
 	}
 	else {
-		return boost::none;
+		return boost::none; 
 	}
 }
 
@@ -289,7 +305,7 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 	std::cout << "[INFO] removing dubplicate/redundant point objects\n";
 	IfcSchema::IfcCartesianPoint::list::ptr pointList = theFile->instances_by_type<IfcSchema::IfcCartesianPoint>();
 
-	double scale = 1 / pow(10, floatingPointSize - 1);
+	double scale = pow(10, floatingPointSize - 1);
 	int pointListSize = pointList->size();
 	int currentItemCount = 0;
 
@@ -307,10 +323,17 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 		IfcSchema::IfcCartesianPoint* currentPoint = *currentPointIt;
 		std::vector<double> currentCoords = currentPoint->Coordinates();
 
+		bool is3D = true;
+		if (currentCoords.size() == 2)
+		{
+			is3D = false;
+		}
+
 		IntPoint roundedPoint{
-			static_cast<int>(std::round(currentCoords[0] / scale)),
-			static_cast<int>(std::round(currentCoords[1] / scale)),
-			static_cast<int>(std::round(currentCoords[2] / scale))
+			static_cast<int64_t>(std::round(currentCoords[0] * scale)),
+			static_cast<int64_t>(std::round(currentCoords[1] * scale)),
+			static_cast<int64_t>(std::round(currentCoords[2] * scale)),
+			is3D
 		};
 
 		auto [storedPoint, inserted] = processedItems.emplace(roundedPoint, currentPoint);
@@ -329,7 +352,6 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 				IfcSchema::IfcAxis2Placement2D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement2D>();
 				if (placementObject == nullptr) { continue; }
 				placementObject->setLocation(uniquePoint);
-				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
 				continue;
 			}
 			if (objectTypeName == "IfcAxis2Placement3D")
@@ -337,7 +359,6 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 				IfcSchema::IfcAxis2Placement3D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement3D>();
 				if (placementObject == nullptr) { continue; }
 				placementObject->setLocation(uniquePoint);
-				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
 				continue;
 			}
 			if (objectTypeName == "IfcBoundingBox")
@@ -345,7 +366,6 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 				IfcSchema::IfcBoundingBox* bBoxObject = referenceObject->as<IfcSchema::IfcBoundingBox>();
 				if (bBoxObject == nullptr) { continue; }
 				bBoxObject->setCorner(uniquePoint);
-				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
 				continue;
 			}
 			if (objectTypeName == "IfcCartesianTransformationOperator3D")
@@ -353,7 +373,6 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 				IfcSchema::IfcCartesianTransformationOperator3D* transformatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator3D>();
 				if (transformatorObject == nullptr) { continue; }
 				transformatorObject->setLocalOrigin(uniquePoint);
-				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
 				continue;
 			}
 			if (objectTypeName == "IfcPolyline")
@@ -375,7 +394,6 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 					newPointList->push(loopPoint);
 				}
 				polyLineObject->setPoints(newPointList);
-				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
 				continue;
 			}
 			if (objectTypeName == "IfcPolyLoop")
@@ -397,18 +415,20 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 					newPointList->push(loopPoint);
 				}
 				polyLineObject->setPolygon(newPointList);
-				toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+				
 				continue;
 			}
 			std::cout << referenceObject->declaration().name() << std::endl;
 		}
+		auto refs = theFile->instances_by_reference(currentPoint->data().id());
+		if (refs->size() != 0) {
+			continue;
+		}
+		toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
 	}
 	std::cout << currentItemCount << " of " << pointListSize << " objects\n";
 
 	// delete the dubs that are dangling
-	std::sort(toBeEliminatedObjectIDs.begin(), toBeEliminatedObjectIDs.end());
-	auto last = std::unique(toBeEliminatedObjectIDs.begin(), toBeEliminatedObjectIDs.end());
-	toBeEliminatedObjectIDs.erase(last, toBeEliminatedObjectIDs.end());
 	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeEliminatedObjectIDs);
 	return theFile;
 }
@@ -501,7 +521,7 @@ int main(int argc, char* argv[])
 	if (!ifcFile->good()) { return 1; }
 	std::cout << "file succesfully read\n";
 
-	int precisionPoint = 6;
+	int precisionPoint =  6;
 	std::string currentIfcVersion = ifcFile->schema()->name();
 
 	if (currentIfcVersion == "IFC2X3") { ifcFile = processFile<Ifc2x3>(std::move(ifcFile), filePath, precisionPoint); }
@@ -513,7 +533,7 @@ int main(int argc, char* argv[])
 	else if (currentIfcVersion == "IFC4X3_ADD2") { ifcFile = processFile<Ifc4x3_add2>(std::move(ifcFile), filePath, precisionPoint); }
 	else
 	{
-		std::cout << "Ifc version is not (yet) supported: " << currentIfcVersion << "\n";
+		std::cout << "Ifc version is not supported: " << currentIfcVersion << "\n";
 	}
 
 	std::ofstream storageFile;
