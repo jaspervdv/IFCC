@@ -187,6 +187,57 @@ boost::optional<std::string> getDescription(T* prop) {
 }
 
 template <typename IfcSchema>
+void updatePset(IfcUtil::IfcBaseClass* currentPropertySetBase, int toBeReplacedId, typename IfcSchema::IfcPropertySingleValue* uniquePropertyValue)
+{
+	if (currentPropertySetBase->data().type()->name() == "IfcPropertySet")
+	{
+		IfcSchema::IfcPropertySet* currentPropertySet = currentPropertySetBase->as<IfcSchema::IfcPropertySet>();
+		IfcSchema::IfcProperty::list::ptr propertyList = currentPropertySet->HasProperties();
+		IfcSchema::IfcProperty::list::ptr newPropertyList = boost::make_shared<IfcSchema::IfcProperty::list>();
+
+		for (auto it4 = propertyList->begin(); it4 != propertyList->end(); ++it4)
+		{
+			IfcSchema::IfcProperty* ttt = *it4;
+			if (ttt->data().id() == toBeReplacedId)
+			{
+				newPropertyList->push(uniquePropertyValue);
+				continue;
+			}
+			newPropertyList->push(ttt);
+		}
+		currentPropertySet->setHasProperties(newPropertyList);
+	}
+	else if (currentPropertySetBase->data().type()->name() == "IfcMaterialProperties")
+	{
+		if constexpr (std::is_same_v<IfcSchema, Ifc2x3>){ return; }
+		else
+		{
+			IfcSchema::IfcMaterialProperties* currentPropertySet = currentPropertySetBase->as<IfcSchema::IfcMaterialProperties>();
+			IfcSchema::IfcProperty::list::ptr propertyList = currentPropertySet->Properties();
+			IfcSchema::IfcProperty::list::ptr newPropertyList = boost::make_shared<IfcSchema::IfcProperty::list>();
+
+			for (auto it4 = propertyList->begin(); it4 != propertyList->end(); ++it4)
+			{
+				IfcSchema::IfcProperty* ttt = *it4;
+				if (ttt->data().id() == toBeReplacedId)
+				{
+					newPropertyList->push(uniquePropertyValue);
+					continue;
+				}
+				newPropertyList->push(ttt);
+			}
+			currentPropertySet->setProperties(newPropertyList);
+		}	
+	}
+	else 
+	{
+		std::cout << currentPropertySetBase->data().type()->name() << std::endl;
+	}
+	
+	return;
+}
+
+template <typename IfcSchema>
 std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile)
 {
 	std::cout << "[INFO] removing dubplicate/redundant Pset objects\n";
@@ -222,42 +273,23 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 		// check if dub and store the unique data
 		auto [storedPropertyKey, inserted] = processedItems.emplace(key, currentPropertyValue);
 		if (inserted) { continue; }
+
+		int currentId = currentPropertyValue->data().id();
 		
 		IfcSchema::IfcPropertySingleValue* uniquePropertyValue = storedPropertyKey->second;
-		auto aggregateList = theFile->instances_by_reference(currentPropertyValue->data().id());
+		auto aggregateList = theFile->instances_by_reference(currentId);
 
 		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
 		{
-			IfcUtil::IfcBaseClass* currentPropertySetBase = *agregateIt;
-
-			if (currentPropertySetBase->data().type()->name() != "IfcPropertySet")
-			{
-				continue;
-			}
-
-			IfcSchema::IfcPropertySet* currentPropertySet = currentPropertySetBase->as<IfcSchema::IfcPropertySet>();
-			IfcSchema::IfcProperty::list::ptr propertyList = currentPropertySet->HasProperties();
-			IfcSchema::IfcProperty::list::ptr newPropertyList = boost::make_shared<IfcSchema::IfcProperty::list>();
-
-			for (auto it4 = propertyList->begin(); it4 != propertyList->end(); ++it4)
-			{
-				IfcSchema::IfcProperty* ttt = *it4;
-				if (ttt->data().id() == currentPropertyValue->data().id())
-				{
-					newPropertyList->push(uniquePropertyValue);
-					continue;
-				}
-				newPropertyList->push(ttt);
-			}
-			currentPropertySet->setHasProperties(newPropertyList);
+			updatePset<IfcSchema>(*agregateIt, currentId, uniquePropertyValue);
 		}
 
-		auto refs = theFile->instances_by_reference(currentPropertyValue->data().id());
+		auto refs = theFile->instances_by_reference(currentId);
 		if (refs->size() != 0) {
 			continue;
 		}
 
-		toBeEliminatedPropertyValuesId.emplace_back(currentPropertyValue->data().id());
+		toBeEliminatedPropertyValuesId.emplace_back(currentId);
 	}
 
 	std::cout << currentItemCount << " of " << propListSise << " objects\n";
