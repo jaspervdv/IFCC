@@ -238,9 +238,10 @@ void updatePset(IfcUtil::IfcBaseClass* currentPropertySetBase, int toBeReplacedI
 }
 
 template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile)
+std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, std::vector<int>* tobedeletedID)
 {
-	std::cout << "[INFO] removing dubplicate/redundant Pset objects\n";
+	std::cout << "[INFO] removing duplicate/redundant Pset objects\n";
+	int currentDeleteSize = tobedeletedID->size();
 
 	// fetch all the properties
 	IfcSchema::IfcPropertySingleValue::list::ptr propertyValues = theFile->instances_by_type<IfcSchema::IfcPropertySingleValue>();
@@ -249,7 +250,6 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 
 	// collapse properties that are identical into a single item
 	std::unordered_map<PropertyKey<IfcSchema>, IfcSchema::IfcPropertySingleValue*, PropertyKeyHash> processedItems;
-	std::vector<int> toBeEliminatedPropertyValuesId;
 
 	for (auto globalPropertyIt = propertyValues->begin(); globalPropertyIt != propertyValues->end(); ++globalPropertyIt)
 	{
@@ -288,13 +288,11 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 		if (refs->size() != 0) {
 			continue;
 		}
-
-		toBeEliminatedPropertyValuesId.emplace_back(currentId);
+		tobedeletedID->emplace_back(currentId);
 	}
-
 	std::cout << currentItemCount << " of " << propListSise << " objects\n";
+	std::cout << tobedeletedID->size() - currentDeleteSize << " redundant objects found\n";
 
-	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeEliminatedPropertyValuesId);
 	return theFile;
 } 
 
@@ -302,7 +300,7 @@ template <typename IfcSchema>
 void roundFloats(IfcParse::IfcFile* theFile, int floatingPointSize)
 {
 	double scale = pow(10, floatingPointSize - 1);
-	std::cout << "[INFO] Rounding point coordintates to " << 1/scale << "\n";
+	std::cout << "[INFO] Rounding point coordinates to " << 1/scale << "\n";
 
 	IfcSchema::IfcCartesianPoint::list::ptr pointList =  theFile->instances_by_type<IfcSchema::IfcCartesianPoint>();
 
@@ -329,9 +327,10 @@ void roundFloats(IfcParse::IfcFile* theFile, int floatingPointSize)
 }
 
 template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize)
+std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize, std::vector<int>* tobedeletedID)
 {
-	std::cout << "[INFO] removing dubplicate/redundant point objects\n";
+	std::cout << "[INFO] removing duplicate/redundant point objects\n";
+	int currentDeleteSize = tobedeletedID->size();
 	IfcSchema::IfcCartesianPoint::list::ptr pointList = theFile->instances_by_type<IfcSchema::IfcCartesianPoint>();
 
 	double scale = pow(10, floatingPointSize - 1);
@@ -339,7 +338,6 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 	int currentItemCount = 0;
 
 	std::unordered_map<IntPoint, IfcSchema::IfcCartesianPoint*, IntPointHash> processedItems;
-	std::vector<int> toBeEliminatedObjectIDs;
 
 	for (auto currentPointIt = pointList->begin(); currentPointIt != pointList->end(); ++currentPointIt)
 	{
@@ -454,19 +452,18 @@ std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcF
 		if (refs->size() != 0) {
 			continue;
 		}
-		toBeEliminatedObjectIDs.emplace_back(currentPoint->data().id());
+		tobedeletedID->emplace_back(currentPoint->data().id());
 	}
 	std::cout << currentItemCount << " of " << pointListSize << " objects\n";
-
-	// delete the dubs that are dangling
-	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeEliminatedObjectIDs);
+	std::cout << tobedeletedID->size() - currentDeleteSize << " redundant objects found\n";
 	return theFile;
 }
 
 template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize)
+std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize, std::vector<int>* tobedeletedID)
 {
-	std::cout << "[INFO] removing dubplicate/redundant direction objects\n";
+	std::cout << "[INFO] removing duplicate/redundant direction objects\n";
+	int currentDeleteSize = tobedeletedID->size();
 	IfcSchema::IfcDirection::list::ptr directionList = theFile->instances_by_type<IfcSchema::IfcDirection>();
 
 	double scale = pow(10, floatingPointSize - 1);
@@ -474,7 +471,6 @@ std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::
 	int currentItemCount = 0;
 
 	std::unordered_map<IntPoint, IfcSchema::IfcDirection*, IntPointHash> processedItems;
-	std::vector<int> toBeEliminatedObjectIDs;
 
 	for (auto currentPointIt = directionList->begin(); currentPointIt != directionList->end(); ++currentPointIt)
 	{
@@ -564,12 +560,10 @@ std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::
 		if (refs->size() != 0) {
 			continue;
 		}
-		toBeEliminatedObjectIDs.emplace_back(currentDir->data().id());
+		tobedeletedID->emplace_back(currentDir->data().id());
 	}
 	std::cout << currentItemCount << " of " << dirListSize << " objects\n";
-
-	// delete the dubs that are dangling
-	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeEliminatedObjectIDs);
+	std::cout << tobedeletedID->size() - currentDeleteSize << " redundant objects found\n";
 	return theFile;
 }
 
@@ -634,12 +628,13 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 template <typename IfcSchema>
 std::unique_ptr<IfcParse::IfcFile> processFile(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize)
 {
-	theFile = collapseProperties<IfcSchema>(std::move(theFile), pathToFile);
+	std::vector<int> tobedeletedID;
+	theFile = collapseProperties<IfcSchema>(std::move(theFile), pathToFile, &tobedeletedID);
 	roundFloats<IfcSchema>(theFile.get(), floatingPointSize);
-	theFile = collapsePoints<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize);
-	theFile = collapseDirections<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize);
-
-	//TODO: centralize the object delete process
+	theFile = collapsePoints<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize, &tobedeletedID);
+	theFile = collapseDirections<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize, &tobedeletedID);
+	// delete the dubs that are dangling
+	theFile = forcefullDelete(std::move(theFile), pathToFile, tobedeletedID);
 	return theFile;
 }
 
