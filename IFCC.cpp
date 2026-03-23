@@ -1,14 +1,6 @@
 #define USE_IFC2x3
 #define programVersion "0.1.0"
 
-#include <ifcparse/Ifc2x3.h>
-#include <ifcparse/Ifc4x1.h>
-#include <ifcparse/Ifc4x2.h>
-#include <ifcparse/Ifc4.h>
-#include <ifcparse/Ifc4x3.h>
-#include <ifcparse/Ifc4x3_add1.h>
-#include <ifcparse/Ifc4x3_add2.h>
-
 #include <fstream>
 #include <iostream>
 #include <filesystem>
@@ -19,70 +11,6 @@
 
 #include <boost/make_shared.hpp>
 #include <boost/optional/optional_io.hpp>
-
-template <typename IfcSchema>
-struct PropertyKey
-{
-	std::string name;
-	std::string value;
-	typename IfcSchema::IfcUnit* unit;
-	boost::optional<std::string> description;
-
-	bool operator==(const PropertyKey& other) const
-	{
-		return name == other.name &&
-			value == other.value &&
-			unit == other.unit &&
-			description == other.description;
-	}
-};
-
-struct PropertyKeyHash
-{
-	template <typename IfcSchema>
-	size_t operator()(const PropertyKey<IfcSchema>& k) const
-	{
-		size_t h1 = std::hash<std::string>{}(k.name);
-		size_t h2 = std::hash<std::string>{}(k.value);
-		size_t h3 = std::hash<void*>{}(k.unit);
-		size_t h4 = k.description ? std::hash<std::string>{}(*k.description) : 0;
-
-		size_t hash = h1;
-		hash ^= h2 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		hash ^= h3 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		hash ^= h4 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		return hash;
-	}
-};
-
-struct IntPoint
-{
-	int64_t x;
-	int64_t y;
-	int64_t z;
-	bool is3D;
-
-	bool operator==(const IntPoint& other) const {
-		if (is3D != other.is3D) { return false; }
-		if (is3D) { return x == other.x && y == other.y && z == other.z; }
-		return x == other.x && y == other.y;
-	}
-};
-
-struct IntPointHash
-{
-	size_t operator()(const IntPoint& p) const
-	{
-		size_t h1 = std::hash<int64_t>{}(p.x);
-		size_t h2 = std::hash<int64_t>{}(p.y);
-		size_t h3 = std::hash<int64_t>{}(p.z);
-
-		size_t hash = h1;
-		hash ^= h2 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		hash ^= h3 + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-		return hash;
-	}
-};
 
 std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::IfcFile> theFile, std::filesystem::path pathToFile, std::vector<int> toBeDeletedIdist)
 {
@@ -172,130 +100,6 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 	return theFile;
 }
 
-template <typename T>
-boost::optional<std::string> getDescription(T* prop) {
-	if constexpr (std::is_same_v<T, Ifc2x3::IfcPropertySingleValue> ||
-		std::is_same_v<T, Ifc4::IfcPropertySingleValue> ||
-		std::is_same_v<T, Ifc4x1::IfcPropertySingleValue> ||
-		std::is_same_v<T, Ifc4x2::IfcPropertySingleValue>)
-	{
-		return prop->Description();
-	}
-	else {
-		return boost::none; 
-	}
-}
-
-template <typename IfcSchema>
-void updatePset(IfcUtil::IfcBaseClass* currentPropertySetBase, int toBeReplacedId, typename IfcSchema::IfcPropertySingleValue* uniquePropertyValue)
-{
-	if (currentPropertySetBase->data().type()->name() == "IfcPropertySet")
-	{
-		IfcSchema::IfcPropertySet* currentPropertySet = currentPropertySetBase->as<IfcSchema::IfcPropertySet>();
-		IfcSchema::IfcProperty::list::ptr propertyList = currentPropertySet->HasProperties();
-		IfcSchema::IfcProperty::list::ptr newPropertyList = boost::make_shared<IfcSchema::IfcProperty::list>();
-
-		for (auto it4 = propertyList->begin(); it4 != propertyList->end(); ++it4)
-		{
-			IfcSchema::IfcProperty* ttt = *it4;
-			if (ttt->data().id() == toBeReplacedId)
-			{
-				newPropertyList->push(uniquePropertyValue);
-				continue;
-			}
-			newPropertyList->push(ttt);
-		}
-		currentPropertySet->setHasProperties(newPropertyList);
-	}
-	else if (currentPropertySetBase->data().type()->name() == "IfcMaterialProperties")
-	{
-		if constexpr (std::is_same_v<IfcSchema, Ifc2x3>){ return; }
-		else
-		{
-			IfcSchema::IfcMaterialProperties* currentPropertySet = currentPropertySetBase->as<IfcSchema::IfcMaterialProperties>();
-			IfcSchema::IfcProperty::list::ptr propertyList = currentPropertySet->Properties();
-			IfcSchema::IfcProperty::list::ptr newPropertyList = boost::make_shared<IfcSchema::IfcProperty::list>();
-
-			for (auto it4 = propertyList->begin(); it4 != propertyList->end(); ++it4)
-			{
-				IfcSchema::IfcProperty* ttt = *it4;
-				if (ttt->data().id() == toBeReplacedId)
-				{
-					newPropertyList->push(uniquePropertyValue);
-					continue;
-				}
-				newPropertyList->push(ttt);
-			}
-			currentPropertySet->setProperties(newPropertyList);
-		}	
-	}
-	else 
-	{
-		std::cout << currentPropertySetBase->data().type()->name() << std::endl;
-	}
-	
-	return;
-}
-
-template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, std::vector<int>* tobedeletedID)
-{
-	std::cout << "[INFO] removing duplicate/redundant Pset objects\n";
-	int currentDeleteSize = tobedeletedID->size();
-
-	// fetch all the properties
-	IfcSchema::IfcPropertySingleValue::list::ptr propertyValues = theFile->instances_by_type<IfcSchema::IfcPropertySingleValue>();
-	int propListSise = propertyValues->size();
-	int currentItemCount = 0;
-
-	// collapse properties that are identical into a single item
-	std::unordered_map<PropertyKey<IfcSchema>, IfcSchema::IfcPropertySingleValue*, PropertyKeyHash> processedItems;
-
-	for (auto globalPropertyIt = propertyValues->begin(); globalPropertyIt != propertyValues->end(); ++globalPropertyIt)
-	{
-		if (currentItemCount % 100 == 0)
-		{
-			std::cout << currentItemCount << " of " << propListSise << " objects\r";
-		}
-		
-		currentItemCount++;
-
-		IfcSchema::IfcPropertySingleValue* currentPropertyValue = *globalPropertyIt;
-		if (currentPropertyValue == nullptr) { continue; }
-
-		PropertyKey<IfcSchema> key{
-		currentPropertyValue->Name(),
-		currentPropertyValue->NominalValue()->data().toString(),
-		currentPropertyValue->Unit(),
-		getDescription(currentPropertyValue)
-		};
-
-		// check if dub and store the unique data
-		auto [storedPropertyKey, inserted] = processedItems.emplace(key, currentPropertyValue);
-		if (inserted) { continue; }
-
-		int currentId = currentPropertyValue->data().id();
-		
-		IfcSchema::IfcPropertySingleValue* uniquePropertyValue = storedPropertyKey->second;
-		auto aggregateList = theFile->instances_by_reference(currentId);
-
-		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
-		{
-			updatePset<IfcSchema>(*agregateIt, currentId, uniquePropertyValue);
-		}
-
-		auto refs = theFile->instances_by_reference(currentId);
-		if (refs->size() != 0) {
-			continue;
-		}
-		tobedeletedID->emplace_back(currentId);
-	}
-	std::cout << currentItemCount << " of " << propListSise << " objects\n";
-	std::cout << tobedeletedID->size() - currentDeleteSize << " redundant objects found\n";
-
-	return theFile;
-} 
-
 std::vector<std::string> tokenizeString(const std::string& theString, const std::string& delimiters) {
 	std::vector<std::string> tokens;
 
@@ -356,7 +160,7 @@ std::string roundStringFloats(const std::string& theString, int floatLength)
 
 void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
 {
-	std::cout << "round floating point values to" << 1 / pow(10, floatLength) << "\n";
+	std::cout << "[INFO] round floating point values to " << 1 / pow(10, floatLength) << "\n";
 
 	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
 	std::ofstream tempFile(tempPath);
@@ -396,244 +200,105 @@ void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
 	return;
 }
 
-template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> collapsePoints(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize, std::vector<int>* tobedeletedID)
+std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int iteration = 1)
 {
-	std::cout << "[INFO] removing duplicate/redundant point objects\n";
-	int currentDeleteSize = tobedeletedID->size();
-	IfcSchema::IfcCartesianPoint::list::ptr pointList = theFile->instances_by_type<IfcSchema::IfcCartesianPoint>();
+	std::map<std::string, std::unordered_map<std::string, IfcUtil::IfcBaseClass*>> uniqueItemMap;
+	std::map<int, std::string> storedOutputStrings;
+	std::vector<int> toBeDeletedIndx;
 
-	double scale = pow(10, floatingPointSize - 1);
-	int pointListSize = pointList->size();
-	int currentItemCount = 0;
+	int counter = 0;
 
-	std::unordered_map<IntPoint, IfcSchema::IfcCartesianPoint*, IntPointHash> processedItems;
+	std::cout << "\n[INFO] collapsing redundant classes, iteration: " << iteration << "\n";
 
-	for (auto currentPointIt = pointList->begin(); currentPointIt != pointList->end(); ++currentPointIt)
+	for (auto fileIt = theFile->begin(); fileIt != theFile->end(); ++fileIt)
 	{
-		if (currentItemCount % 100 == 0)
+		if (counter % 100 == 0)
 		{
-			std::cout << currentItemCount << " of " << pointListSize << " objects\r";
+			std::cout << "processing objects: " << counter << "\r";
 		}
-		currentItemCount++;
+		
+		counter++;
 
-		IfcSchema::IfcCartesianPoint* currentPoint = *currentPointIt;
-		std::vector<double> currentCoords = currentPoint->Coordinates();
+		auto t = *fileIt;
 
-		IntPoint roundedPoint = (currentCoords.size() == 2)
-			? IntPoint{
-				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
-				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
-				0,
-				false
+		IfcUtil::IfcBaseClass* test = t.second;
+		std::string classStringRep = test->data().toString();
+		
+		std::string classType = test->data().type()->name();
+		std::string dataClassComp = classStringRep.substr(classStringRep.find_first_of("("), classStringRep.size());
+
+		if (uniqueItemMap.find(classType) == uniqueItemMap.end())
+		{
+			std::unordered_map<std::string, IfcUtil::IfcBaseClass*> newMap;
+			newMap.emplace(dataClassComp, test);
+			uniqueItemMap.emplace(classType, newMap);
+			continue;
 		}
-			: IntPoint{
-				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
-				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
-				static_cast<int64_t>(std::round(currentCoords[2] * scale)),
-				true
-		};
 
-		auto [storedPoint, inserted] = processedItems.emplace(roundedPoint, currentPoint);
+		auto [storedPropertyKey, inserted] = uniqueItemMap[classType].emplace(dataClassComp, test);
 		if (inserted) { continue; }
 
-		IfcSchema::IfcCartesianPoint* uniquePoint = storedPoint->second;
-		auto aggregateList = theFile->instances_by_reference(currentPoint->data().id());
+		IfcUtil::IfcBaseClass* uniqueItem = storedPropertyKey->second;
 
-		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
+		aggregate_of_instance::ptr referencedBy = theFile->instances_by_reference(t.first);
+
+		for (auto referenceIt = referencedBy->begin(); referenceIt != referencedBy->end(); ++referenceIt)
 		{
-			IfcUtil::IfcBaseClass* referenceObject = *agregateIt;
-			std::string objectTypeName = referenceObject->declaration().name();
+			IfcUtil::IfcBaseClass* reference = *referenceIt;
+			for (size_t i = 0; i < reference->data().getArgumentCount(); i++)
+			{
+				Argument* currentArgument = reference->data().getArgument(i);
+				IfcUtil::ArgumentType currentArgumentType = currentArgument->type();
 
-			if (objectTypeName == "IfcAxis2Placement2D")
-			{
-				IfcSchema::IfcAxis2Placement2D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement2D>();
-				if (placementObject == nullptr) { continue; }
-				placementObject->setLocation(uniquePoint);
-				continue;
-			}
-			if (objectTypeName == "IfcAxis2Placement3D")
-			{
-				IfcSchema::IfcAxis2Placement3D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement3D>();
-				if (placementObject == nullptr) { continue; }
-				placementObject->setLocation(uniquePoint);
-				continue;
-			}
-			if (objectTypeName == "IfcBoundingBox")
-			{
-				IfcSchema::IfcBoundingBox* bBoxObject = referenceObject->as<IfcSchema::IfcBoundingBox>();
-				if (bBoxObject == nullptr) { continue; }
-				bBoxObject->setCorner(uniquePoint);
-				continue;
-			}
-			if (objectTypeName == "IfcCartesianTransformationOperator3D")
-			{
-				IfcSchema::IfcCartesianTransformationOperator3D* transformatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator3D>();
-				if (transformatorObject == nullptr) { continue; }
-				transformatorObject->setLocalOrigin(uniquePoint);
-				continue;
-			}
-			if (objectTypeName == "IfcPolyline")
-			{
-				IfcSchema::IfcPolyline* polyLineObject = referenceObject->as<IfcSchema::IfcPolyline>();
-				if (polyLineObject == nullptr) { continue; }
-
-				IfcSchema::IfcCartesianPoint::list::ptr pointList = polyLineObject->Points();
-				IfcSchema::IfcCartesianPoint::list::ptr newPointList = boost::make_shared< IfcSchema::IfcCartesianPoint::list>();
-
-				for (auto loopPointIt = pointList->begin(); loopPointIt != pointList->end(); ++loopPointIt)
+				if (currentArgumentType == IfcUtil::Argument_AGGREGATE_OF_ENTITY_INSTANCE)
 				{
-					IfcSchema::IfcCartesianPoint* loopPoint = *loopPointIt;
-					if (loopPoint->data().id() == currentPoint->data().id())
-					{
-						newPointList->push(uniquePoint);
-						continue;
-					}
-					newPointList->push(loopPoint);
-				}
-				polyLineObject->setPoints(newPointList);
-				continue;
-			}
-			if (objectTypeName == "IfcPolyLoop")
-			{
-				IfcSchema::IfcPolyLoop* polyLineObject = referenceObject->as<IfcSchema::IfcPolyLoop>();
-				if (polyLineObject == nullptr) { continue; }
+					aggregate_of_instance::ptr currentAggregate = currentArgument->operator aggregate_of_instance::ptr();
+					aggregate_of_instance::ptr newAggregate = boost::make_shared< aggregate_of_instance>();
 
-				IfcSchema::IfcCartesianPoint::list::ptr pointList = polyLineObject->Polygon();
-				IfcSchema::IfcCartesianPoint::list::ptr newPointList = boost::make_shared< IfcSchema::IfcCartesianPoint::list>();
-
-				for (auto loopPointIt = pointList->begin(); loopPointIt != pointList->end(); ++loopPointIt)
-				{
-					IfcSchema::IfcCartesianPoint* loopPoint = *loopPointIt;
-					if (loopPoint->data().id() == currentPoint->data().id())
+					for (auto aggregateIt = currentAggregate->begin(); aggregateIt != currentAggregate->end(); ++ aggregateIt)
 					{
-						newPointList->push(uniquePoint);
-						continue;
+						IfcUtil::IfcBaseClass* argumentBaseclass = *aggregateIt;
+						if (argumentBaseclass->data().id() != t.first)
+						{
+							newAggregate->push(argumentBaseclass);
+							continue; 
+						}
+						newAggregate->push(uniqueItem);
 					}
-					newPointList->push(loopPoint);
+
+					IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
+					writeArgument->set(newAggregate);
+					
+					reference->data().setArgument(i, writeArgument);
 				}
-				polyLineObject->setPolygon(newPointList);
 				
-				continue;
+				if (currentArgumentType == IfcUtil::Argument_ENTITY_INSTANCE)
+				{
+					IfcUtil::IfcBaseClass* argumentBaseclass = currentArgument->operator IfcUtil::IfcBaseClass* ();
+					if (argumentBaseclass->data().id() != t.first) { continue; }
+					
+					IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
+					writeArgument->set(uniqueItem);
+					reference->data().setArgument(i, writeArgument);
+				}
 			}
-			std::cout << referenceObject->declaration().name() << std::endl;
 		}
-		auto refs = theFile->instances_by_reference(currentPoint->data().id());
+
+		auto refs = theFile->instances_by_reference(t.first);
 		if (refs->size() != 0) {
 			continue;
 		}
-		tobedeletedID->emplace_back(currentPoint->data().id());
+		toBeDeletedIndx.emplace_back(t.first);
 	}
-	std::cout << currentItemCount << " of " << pointListSize << " objects\n";
-	std::cout << tobedeletedID->size() - currentDeleteSize << " redundant objects found\n";
-	return theFile;
-}
+	std::cout << "processing objects: " << counter << "\n";
+	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeDeletedIndx);
 
-template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> collapseDirections(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize, std::vector<int>* tobedeletedID)
-{
-	std::cout << "[INFO] removing duplicate/redundant direction objects\n";
-	int currentDeleteSize = tobedeletedID->size();
-	IfcSchema::IfcDirection::list::ptr directionList = theFile->instances_by_type<IfcSchema::IfcDirection>();
-
-	double scale = pow(10, floatingPointSize - 1);
-	int dirListSize = directionList->size();
-	int currentItemCount = 0;
-
-	std::unordered_map<IntPoint, IfcSchema::IfcDirection*, IntPointHash> processedItems;
-
-	for (auto currentPointIt = directionList->begin(); currentPointIt != directionList->end(); ++currentPointIt)
+	if (!toBeDeletedIndx.empty())
 	{
-		if (currentItemCount % 100 == 0)
-		{
-			std::cout << currentItemCount << " of " << dirListSize << " objects\r";
-		}
-		currentItemCount++;
-
-		IfcSchema::IfcDirection* currentDir = *currentPointIt;
-		std::vector<double> currentCoords = currentDir->DirectionRatios();
-
-		IntPoint roundedPoint = (currentCoords.size() == 2)
-			? IntPoint{
-				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
-				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
-				0,
-				false
-		}
-			: IntPoint{
-				static_cast<int64_t>(std::round(currentCoords[0] * scale)),
-				static_cast<int64_t>(std::round(currentCoords[1] * scale)),
-				static_cast<int64_t>(std::round(currentCoords[2] * scale)),
-				true
-		};
-
-		auto [storedDir, inserted] = processedItems.emplace(roundedPoint, currentDir);
-		if (inserted) { continue; }
-
-		IfcSchema::IfcDirection* uniqueDir = storedDir->second;
-		auto aggregateList = theFile->instances_by_reference(currentDir->data().id());
-
-		for (auto agregateIt = aggregateList->begin(); agregateIt != aggregateList->end(); ++agregateIt)
-		{
-			IfcUtil::IfcBaseClass* referenceObject = *agregateIt;
-			std::string objectTypeName = referenceObject->declaration().name();
-
-			if (objectTypeName == "IfcAxis2Placement2D")
-			{
-				IfcSchema::IfcAxis2Placement2D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement2D>();
-				if (placementObject == nullptr) { continue; }
-				placementObject->setRefDirection(uniqueDir);
-				continue;
-			}
-			if (objectTypeName == "IfcAxis2Placement3D")
-			{
-				IfcSchema::IfcAxis2Placement3D* placementObject = referenceObject->as<IfcSchema::IfcAxis2Placement3D>();
-				if (placementObject == nullptr) { continue; }
-				if (placementObject->Axis() == currentDir) { placementObject->setAxis(uniqueDir); }
-				else if (placementObject->RefDirection() == currentDir) { placementObject->setRefDirection(uniqueDir); }
-				continue;
-			}
-			if (objectTypeName == "IfcCartesianTransformationOperator2D")
-			{
-				IfcSchema::IfcCartesianTransformationOperator2D* operatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator2D>();
-				if (operatorObject == nullptr) { continue; }
-				if (operatorObject->Axis1() == currentDir) { operatorObject->setAxis1(uniqueDir); }
-				if (operatorObject->Axis2() == currentDir) { operatorObject->setAxis2(uniqueDir); }
-				continue;
-			}
-			if (objectTypeName == "IfcCartesianTransformationOperator3D")
-			{
-				IfcSchema::IfcCartesianTransformationOperator3D* operatorObject = referenceObject->as<IfcSchema::IfcCartesianTransformationOperator3D>();
-				if (operatorObject == nullptr) { continue; }
-				if (operatorObject->Axis1() == currentDir) { operatorObject->setAxis1(uniqueDir); }
-				if (operatorObject->Axis2() == currentDir) { operatorObject->setAxis2(uniqueDir); }
-				if (operatorObject->Axis3() == currentDir) { operatorObject->setAxis3(uniqueDir); }
-				continue;
-			}
-			if (objectTypeName == "IfcExtrudedAreaSolid")
-			{
-				IfcSchema::IfcExtrudedAreaSolid* extrusionObject = referenceObject->as<IfcSchema::IfcExtrudedAreaSolid>();
-				if (extrusionObject == nullptr) { continue; }
-				extrusionObject->setExtrudedDirection(uniqueDir);
-				continue;
-			}	
-			if (objectTypeName == "IfcGeometricRepresentationContext")
-			{
-				IfcSchema::IfcGeometricRepresentationContext* repObject = referenceObject->as<IfcSchema::IfcGeometricRepresentationContext>();
-				if (repObject == nullptr) { continue; }
-				repObject->setTrueNorth(uniqueDir);
-				continue;
-			}
-
-		}
-		auto refs = theFile->instances_by_reference(currentDir->data().id());
-		if (refs->size() != 0) {
-			continue;
-		}
-		tobedeletedID->emplace_back(currentDir->data().id());
+		iteration += 1;
+		theFile = collapseClasses(std::move(theFile), pathToFile, iteration);
 	}
-	std::cout << currentItemCount << " of " << dirListSize << " objects\n";
-	std::cout << tobedeletedID->size() - currentDeleteSize << " redundant objects found\n";
+
 	return theFile;
 }
 
@@ -695,18 +360,6 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	return true;
 }
 
-template <typename IfcSchema>
-std::unique_ptr<IfcParse::IfcFile> processFile(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int floatingPointSize)
-{
-	std::vector<int> tobedeletedID;
-	theFile = collapseProperties<IfcSchema>(std::move(theFile), pathToFile, &tobedeletedID);
-	theFile = collapsePoints<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize, &tobedeletedID);
-	theFile = collapseDirections<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize, &tobedeletedID);
-	// delete the dubs that are dangling
-	theFile = forcefullDelete(std::move(theFile), pathToFile, tobedeletedID);
-	return theFile;
-}
-
 
 int main(int argc, char* argv[])
 {
@@ -731,23 +384,11 @@ int main(int argc, char* argv[])
 	if (!ifcFile->good()) { return 1; }
 	std::cout << "file succesfully read\n";
 
-
-	std::string currentIfcVersion = ifcFile->schema()->name();
-	if (currentIfcVersion == "IFC2X3") { ifcFile = processFile<Ifc2x3>(std::move(ifcFile), filePath, precisionPoint); }
-	else if (currentIfcVersion == "IFC4") { ifcFile = processFile<Ifc4>(std::move(ifcFile), filePath, precisionPoint); }
-	else if (currentIfcVersion == "IFC4X1") { ifcFile = processFile<Ifc4x1>(std::move(ifcFile), filePath, precisionPoint); }
-	else if (currentIfcVersion == "IFC4X2") { ifcFile = processFile<Ifc4x2>(std::move(ifcFile), filePath, precisionPoint); }
-	else if (currentIfcVersion == "IFC4X3") { ifcFile = processFile<Ifc4x3>(std::move(ifcFile), filePath, precisionPoint); }
-	else if (currentIfcVersion == "IFC4X3_ADD1") { ifcFile = processFile<Ifc4x3_add1>(std::move(ifcFile), filePath, precisionPoint); }
-	else if (currentIfcVersion == "IFC4X3_ADD2") { ifcFile = processFile<Ifc4x3_add2>(std::move(ifcFile), filePath, precisionPoint); }
-	else
-	{
-		std::cout << "Ifc version is not supported: " << currentIfcVersion << "\n";
-	}
+	ifcFile = collapseClasses(std::move(ifcFile), filePath);
 
 	std::ofstream storageFile;
 	storageFile.open(outputPath);
-	std::cout << "[INFO] Exporting file " << outputPath.string() << std::endl;
+	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;
 	storageFile << *ifcFile;
 	std::cout << "[INFO] Exported succesfully" << std::endl;
 	storageFile.close();
