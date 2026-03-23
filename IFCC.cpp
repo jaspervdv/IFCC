@@ -10,7 +10,6 @@
 #include <ifcparse/IfcHierarchyHelper.h>
 
 #include <boost/make_shared.hpp>
-#include <boost/optional/optional_io.hpp>
 
 std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::IfcFile> theFile, std::filesystem::path pathToFile, std::vector<int> toBeDeletedIdist)
 {
