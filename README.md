@@ -5,11 +5,13 @@
 
 IFCC is a simple console application that compresses IFC files. The implemented method is based on the method developed by [(Sun et al., 2016)](#1) but written from scratch. The application eliminates repeating objects that store identical data. Examples of these objects are IfcCartesianPoint, IfcDirection, and IfcPropertySingleValue. Any object that has a GUID is not touched. Additional compression is achieved by rounding floating values to 0.000001 meter if their precision is higher (0.000001 meter still smaller than the width of a human hair).
 
+![overview](./Images/overview.jpg "An example of the difference between a compressed and uncompressed IFC file")
+
+A visual example of the methodology can be seen below. This model (the [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)) represents a normal IFC file. The model uses multiple IfcQuantityArea objects to encode exactly the same data but for different windows: Area = 2.4 m<sup>2</sup>. All but a single object that encodes this data can be removed without losing data. In even a simple file thousands of these items can be collapsed into a single object. For this model 9830 different objects can be eliminated.
+
 ![uncompressed relationships](./Images/unCompressedQuan.jpg "An example of uncompressed relationships")
 
 ![Compressed relationships](./Images/CompressedQuan.jpg "An example of compressed relationships")
-
-A visual example of the methodology can be seen above. This model (the [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)) represents a normal IFC file. The model uses multiple IfcQuantityArea objects to encode exactly the same data but for different windows: Area = 2.4 m<sup>2</sup>. All but a single object that encodes this data can be removed without losing data. In even a simple file thousands of these items can be collapsed into a single object. For this model 9830 different objects can be eliminated.
 
 | IFC file name  | File size (MB) | Compressed file size (MB) | Reduction |
 |-|-|-|-|
