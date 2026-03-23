@@ -296,33 +296,103 @@ std::unique_ptr<IfcParse::IfcFile> collapseProperties(std::unique_ptr<IfcParse::
 	return theFile;
 } 
 
-template <typename IfcSchema>
-void roundFloats(IfcParse::IfcFile* theFile, int floatingPointSize)
-{
-	double scale = pow(10, floatingPointSize - 1);
-	std::cout << "[INFO] Rounding point coordinates to " << 1/scale << "\n";
+std::vector<std::string> tokenizeString(const std::string& theString, const std::string& delimiters) {
+	std::vector<std::string> tokens;
 
-	IfcSchema::IfcCartesianPoint::list::ptr pointList =  theFile->instances_by_type<IfcSchema::IfcCartesianPoint>();
+	size_t start = 0;
+	size_t pos = 0;
 
-	int pointListSize = pointList->size();
-	int currentItemCount = 0;
-	for (auto pointIt = pointList->begin(); pointIt != pointList->end(); ++ pointIt)
+	while ((pos = theString.find_first_of(delimiters, start)) != std::string::npos)
 	{
-		if (currentItemCount % 100 == 0)
-		{
-			std::cout << currentItemCount << " of " << pointListSize << " objects\r";
-		}
-		currentItemCount++;
-		IfcSchema::IfcCartesianPoint* currentPoint = *pointIt;
-		std::vector<double> currentCoords = currentPoint->Coordinates();
+		if (pos > start)
+			tokens.push_back(theString.substr(start, pos - start));
 
-		for (double& coord : currentCoords)
-		{
-			coord = std::round(coord * scale ) / scale;
-		}
-		currentPoint->setCoordinates(currentCoords);
+		tokens.push_back(theString.substr(pos, 1));
+
+		start = pos + 1;
 	}
-	std::cout << currentItemCount << " of " << pointListSize << " objects\n";
+
+	if (start < theString.size()) { tokens.push_back(theString.substr(start)); }
+
+	return tokens;
+}
+
+bool stringIsNum(const std::string& theString)
+{
+	bool isFirst = true;
+	for (const char& currentChar : theString)
+	{
+		if (isFirst)
+		{
+			isFirst = false;
+
+			if (!std::isdigit(currentChar) && currentChar != '-' && currentChar != '+' && currentChar != '.')
+			{
+				return false;
+			}
+			continue;
+		}
+
+		if (!std::isdigit(currentChar) && currentChar != '.')
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+std::string roundStringFloats(const std::string& theString, int floatLength)
+{
+	size_t fPointLoc = theString.find_first_of('.');
+
+	int maxNumLength = fPointLoc + floatLength + 1;
+
+	if (theString.size() <= maxNumLength)
+	{
+		return theString;
+	}
+	return theString.substr(0, maxNumLength);
+}
+
+void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
+{
+	std::cout << "round floating point values to" << 1 / pow(10, floatLength) << "\n";
+
+	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
+	std::ofstream tempFile(tempPath);
+
+	std::string delimiters = "(),";
+
+	// open the file as generic file and delete lines ad id
+	std::ifstream streamFile(pathToFile);
+	int delCount = 0;
+	if (streamFile.is_open()) {
+
+		std::string line;
+		while (std::getline(streamFile, line)) {
+			if (line[0] != '#') {
+				tempFile << line << "\n";
+				continue;
+			}
+			std::vector<std::string> tokenizedString = tokenizeString(line, delimiters);
+			
+			std::string correctedString = "";
+			for (const std::string& subString : tokenizedString)
+			{
+				if (!stringIsNum(subString))
+				{
+					correctedString += subString;
+					continue;
+				}
+				correctedString += roundStringFloats(subString, floatLength);
+			}
+			tempFile << correctedString << "\n";
+		}
+		streamFile.close();
+	}
+	tempFile.close();
+	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
+	std::filesystem::remove(tempPath);
 	return;
 }
 
@@ -630,7 +700,6 @@ std::unique_ptr<IfcParse::IfcFile> processFile(std::unique_ptr<IfcParse::IfcFile
 {
 	std::vector<int> tobedeletedID;
 	theFile = collapseProperties<IfcSchema>(std::move(theFile), pathToFile, &tobedeletedID);
-	roundFloats<IfcSchema>(theFile.get(), floatingPointSize);
 	theFile = collapsePoints<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize, &tobedeletedID);
 	theFile = collapseDirections<IfcSchema>(std::move(theFile), pathToFile, floatingPointSize, &tobedeletedID);
 	// delete the dubs that are dangling
@@ -653,15 +722,17 @@ int main(int argc, char* argv[])
 	std::filesystem::copy(filePath, localPath, std::filesystem::copy_options::overwrite_existing);
 	filePath = localPath;
 
+	int precisionPoint = 6;
+	roundFloats(filePath, 6);
+
 	std::cout << "read file\n";
 	std::unique_ptr<IfcParse::IfcFile> ifcFile = std::make_unique<IfcParse::IfcFile>(filePath.string());
 	ifcFile = std::make_unique<IfcParse::IfcFile>(filePath.string());
 	if (!ifcFile->good()) { return 1; }
 	std::cout << "file succesfully read\n";
 
-	int precisionPoint =  6;
-	std::string currentIfcVersion = ifcFile->schema()->name();
 
+	std::string currentIfcVersion = ifcFile->schema()->name();
 	if (currentIfcVersion == "IFC2X3") { ifcFile = processFile<Ifc2x3>(std::move(ifcFile), filePath, precisionPoint); }
 	else if (currentIfcVersion == "IFC4") { ifcFile = processFile<Ifc4>(std::move(ifcFile), filePath, precisionPoint); }
 	else if (currentIfcVersion == "IFC4X1") { ifcFile = processFile<Ifc4x1>(std::move(ifcFile), filePath, precisionPoint); }
