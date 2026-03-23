@@ -1,5 +1,5 @@
 #define USE_IFC2x3
-#define programVersion "0.1.0"
+#define programVersion "0.2.0"
 
 #include <fstream>
 #include <iostream>
@@ -197,11 +197,15 @@ void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
 	tempFile.close();
 	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
 	std::filesystem::remove(tempPath);
+	std::cout << "succes" << std::endl;
 	return;
 }
 
 std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, int iteration = 1)
 {
+	int maxBatchSize = 500000;
+	bool isCut = false; 
+
 	std::map<std::string, std::unordered_map<std::string, IfcUtil::IfcBaseClass*>> uniqueItemMap;
 	std::map<int, std::string> storedOutputStrings;
 	std::vector<int> toBeDeletedIndx;
@@ -289,10 +293,22 @@ std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::Ifc
 			continue;
 		}
 		toBeDeletedIndx.emplace_back(t.first);
+
+		if (toBeDeletedIndx.size() > maxBatchSize)
+		{
+			isCut = true;
+			break;
+		}
+
 	}
 	std::cout << "processing objects: " << counter << "\n";
-	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeDeletedIndx);
 
+	if (isCut)
+	{
+		std::cout << "max single batch delete size hit: " << maxBatchSize << "\n";
+	}
+
+	theFile = forcefullDelete(std::move(theFile), pathToFile, toBeDeletedIndx);
 	if (!toBeDeletedIndx.empty())
 	{
 		iteration += 1;
@@ -312,8 +328,22 @@ bool isValidIfcFile(const std::filesystem::path& filePath)
 	return true;
 }
 
+void printDefaultstartInfo() {
+
+
+
+	std::cout << "\n"
+		" _____ _____ ____ ____ \n"
+		"|_   _|  __ / __ / ___|\n"
+		"  | | | |_ | |  | | \n"
+		" _| |_|  _|| |__| |___ \n"
+		"|_____|_|   \\____\\____| version " << programVersion << "\n\n"
+		"Compress IFC files with minimal data loss\n==================================================\n";
+}
+
 void helpOutput() {
-	std::cout << "IFCC V" << programVersion << "\nCompresses IFC files with minimal data loss\nUsage: IFCC.exe 'IFC target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added";
+	printDefaultstartInfo();
+	std::cout << "Usage: IFCC.exe 'IFC target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added";
 }
 
 
@@ -367,6 +397,8 @@ int main(int argc, char* argv[])
 	std::filesystem::path outputPath = "";
 	std::filesystem::path localPath = std::filesystem::path("./temp.ifc");
 
+	printDefaultstartInfo();
+
 	if (!getUserInput(argc, argv, &filePath, &outputPath)) { return 0; }
 
 	std::cout << "\nInput path: " << filePath.string() << "\n";
@@ -378,7 +410,7 @@ int main(int argc, char* argv[])
 	int precisionPoint = 6;
 	roundFloats(filePath, 6);
 
-	std::cout << "read file\n";
+	std::cout << "\nread file\n";
 	std::unique_ptr<IfcParse::IfcFile> ifcFile = std::make_unique<IfcParse::IfcFile>(filePath.string());
 	ifcFile = std::make_unique<IfcParse::IfcFile>(filePath.string());
 	if (!ifcFile->good()) { return 1; }
