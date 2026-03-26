@@ -1,14 +1,15 @@
 #define USE_IFC2x3
-#define programVersion "0.2.1"
+#define programVersion "0.2.2"
 
 #include <fstream>
 #include <iostream>
 #include <filesystem>
+#include <unordered_set>
+
 #include <ifcparse/IfcFile.h>
 #include <ifcparse/utils.h>
 #include <ifcparse/IfcEntityInstanceData.h>
 #include <ifcparse/IfcHierarchyHelper.h>
-#include <unordered_set>
 
 #include <boost/make_shared.hpp>
 
@@ -20,12 +21,8 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 		return theFile;
 	}
 
-	/*std::sort(toBeDeletedIdist.begin(), toBeDeletedIdist.end());
-	auto last = std::unique(toBeDeletedIdist.begin(), toBeDeletedIdist.end());
-	toBeDeletedIdist.erase(last, toBeDeletedIdist.end());*/
-
 	// store the data to the temp file path
-	std::cout << "storing updated References\n";
+	std::cout << "[INFO] storing updated References\n";
 
 	std::ofstream storageFile;
 	storageFile.open(pathToFile);
@@ -59,7 +56,7 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 				ignore = true;
 
 				delCount++;
-				if (delCount % 100 == 0)
+				if (delCount % 1000 == 0)
 				{
 					std::cout << delCount << " objects removed from file\r";
 				}
@@ -190,48 +187,75 @@ void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
 	return;
 }
 
-void updateReference(IfcUtil::IfcBaseClass* reference, IfcUtil::IfcBaseClass* sourceClass, int sourceId, IfcUtil::IfcBaseClass* targetClass)
+void updateReference(const std::set<IfcUtil::IfcBaseClass*>& baseClassList, const std::map<int, IfcUtil::IfcBaseClass*>& referenceMap)
 {
-	IfcEntityInstanceData& referenceData = reference->data();
+	int counter = 0;
+	int totalLineCount = baseClassList.size();
 
-	for (size_t i = 0; i < referenceData.getArgumentCount(); i++)
+	for (IfcUtil::IfcBaseClass* reference : baseClassList)
 	{
-		Argument* currentArgument = referenceData.getArgument(i);
-		IfcUtil::ArgumentType currentArgumentType = currentArgument->type();
-
-		if (currentArgumentType == IfcUtil::Argument_AGGREGATE_OF_ENTITY_INSTANCE)
+		if (counter % 1000 == 0)
 		{
-			aggregate_of_instance::ptr currentAggregate = currentArgument->operator aggregate_of_instance::ptr();
-			if (!currentAggregate->contains(sourceClass)) { continue; }
+			std::cout << "processing objects: " << counter << " (" << (counter * 100) / totalLineCount << "%)\r";
+		}
+		counter++;
 
-			aggregate_of_instance::ptr newAggregate = boost::make_shared< aggregate_of_instance>();
-			newAggregate->reserve(currentAggregate->size());
+		IfcEntityInstanceData& referenceData = reference->data();
+		if (referenceMap.find(referenceData.id()) != referenceMap.end()) { continue; }
 
-			for (auto aggregateIt = currentAggregate->begin(); aggregateIt != currentAggregate->end(); ++aggregateIt)
+		for (size_t i = 0; i < referenceData.getArgumentCount(); i++)
+		{
+			Argument* currentArgument = referenceData.getArgument(i);
+			IfcUtil::ArgumentType currentArgumentType = currentArgument->type();
+
+			if (currentArgumentType == IfcUtil::Argument_AGGREGATE_OF_ENTITY_INSTANCE)
 			{
-				IfcUtil::IfcBaseClass* argumentBaseclass = *aggregateIt;
-				if (argumentBaseclass->data().id() != sourceId)
+				aggregate_of_instance::ptr currentAggregate = currentArgument->operator aggregate_of_instance::ptr();
+				aggregate_of_instance::ptr newAggregate = boost::make_shared< aggregate_of_instance>();
+				newAggregate->reserve(currentAggregate->size());
+
+				bool isNew = false;
+				for (auto aggregateIt = currentAggregate->begin(); aggregateIt != currentAggregate->end(); ++aggregateIt)
 				{
-					newAggregate->push(argumentBaseclass);
+					IfcUtil::IfcBaseClass* argumentBaseclass = *aggregateIt;
+					int currentId = argumentBaseclass->data().id();
+
+					if (referenceMap.find(currentId) == referenceMap.end())
+					{
+						newAggregate->push(argumentBaseclass);
+						continue;
+					}
+					newAggregate->push(referenceMap.at(currentId));
+
+					isNew = true;
+				}
+				if (!isNew)
+				{
 					continue;
 				}
-				newAggregate->push(targetClass);
+
+				IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
+				writeArgument->set(newAggregate);
+
+				referenceData.setArgument(i, writeArgument);
 			}
-			IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
-			writeArgument->set(newAggregate);
+			else if (currentArgumentType == IfcUtil::Argument_ENTITY_INSTANCE)
+			{
+				IfcUtil::IfcBaseClass* argumentBaseclass = currentArgument->operator IfcUtil::IfcBaseClass * ();
+				int currentId = argumentBaseclass->data().id();
 
-			referenceData.setArgument(i, writeArgument);
-		}
-		else if (currentArgumentType == IfcUtil::Argument_ENTITY_INSTANCE)
-		{
-			IfcUtil::IfcBaseClass* argumentBaseclass = currentArgument->operator IfcUtil::IfcBaseClass * ();
-			if (argumentBaseclass->data().id() != sourceId) { continue; }
+				if (referenceMap.find(currentId) == referenceMap.end())
+				{
+					continue;
+				}
+				IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
 
-			IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
-			writeArgument->set(targetClass);
-			referenceData.setArgument(i, writeArgument);
+				writeArgument->set(referenceMap.at(currentId));
+				referenceData.setArgument(i, writeArgument);
+			}
 		}
 	}
+	std::cout << "processing objects: " << counter << " (" << "100%)\n";
 	return;
 }
 
@@ -270,13 +294,14 @@ std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::Ifc
 
 	int currentDelSize = toBeDeletedIndx->size();
 	std::map<std::string, std::unordered_map<std::string, IfcUtil::IfcBaseClass*>> uniqueItemMap;
-	std::map<int, std::string> storedOutputStrings;
+	std::map<int, IfcUtil::IfcBaseClass*> oldNewRefMap;
+	std::set<IfcUtil::IfcBaseClass*> fullBaseClassList;
 	
 	std::cout << "\n[INFO] collapsing redundant classes, iteration: " << iteration << "\n";
 
 	for (auto fileIt = theFile->begin(); fileIt != theFile->end(); ++fileIt)
 	{
-		if (counter % 100 == 0)
+		if (counter % 1000 == 0)
 		{
 			std::cout << "processing objects: " << counter << " (" << (counter * 100) /lineCount << "%)\r";
 		}	
@@ -288,6 +313,8 @@ std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::Ifc
 		if (toBeDeletedIndx->find(currentId) != toBeDeletedIndx->end()) { continue; }
 
 		IfcUtil::IfcBaseClass* currentItem = indxObjectPair.second;
+		fullBaseClassList.emplace(currentItem);
+
 		if (hasGuid(currentItem)) { continue; }
 		
 		std::string classStringRep = currentItem->data().toString();
@@ -306,23 +333,27 @@ std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::Ifc
 		if (inserted) { continue; }
 
 		IfcUtil::IfcBaseClass* uniqueItem = storedPropertyKey->second;
-		aggregate_of_instance::ptr referencedBy = theFile->instances_by_reference(currentId);
+		oldNewRefMap.emplace(currentId, uniqueItem);
+	}
+	std::cout << "processing objects: " << counter << " (100%)\n";
+	std::cout << "[INFO] Updating References\n";
+	updateReference(fullBaseClassList, oldNewRefMap);
+	
 
-		for (auto referenceIt = referencedBy->begin(); referenceIt != referencedBy->end(); ++referenceIt)
-		{
-			updateReference(*referenceIt, currentItem, currentId , uniqueItem);
-		}
 
-		auto refs = theFile->instances_by_reference(currentId);
+	for (auto remapPair : oldNewRefMap)
+	{
+		auto refs = theFile->instances_by_reference(remapPair.first);
 		if (refs->size() != 0) {
 			continue;
 		}
-		toBeDeletedIndx->emplace(currentId);
+		toBeDeletedIndx->emplace(remapPair.first);
 	}
-	std::cout << "processing objects: " << counter << " (100%)\n";
 
 	if (currentDelSize != toBeDeletedIndx->size())
 	{
+		std::cout << "reduced objects to from " << counter << " to " << counter - toBeDeletedIndx->size() << std::endl;
+
 		iteration += 1;
 		theFile = collapseClasses(std::move(theFile), pathToFile, toBeDeletedIndx,  iteration);
 		iteration -= 1;
