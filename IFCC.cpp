@@ -1,5 +1,5 @@
 #define USE_IFC2x3
-#define programVersion "0.2.2"
+#define programVersion "0.2.3"
 
 #include <fstream>
 #include <iostream>
@@ -13,16 +13,16 @@
 
 #include <boost/make_shared.hpp>
 
-std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::IfcFile> theFile, std::filesystem::path pathToFile, std::unordered_set<int> toBeDeletedIdist)
+bool forcefullDelete(std::unique_ptr<IfcParse::IfcFile> theFile, std::filesystem::path pathToFile, std::unordered_set<int> toBeDeletedIdist)
 {
 	if (toBeDeletedIdist.empty()) 
 	{
 		std::cout << "no objects to delete" << std::endl; 
-		return theFile;
+		return true;
 	}
 
 	// store the data to the temp file path
-	std::cout << "[INFO] storing updated References\n";
+	std::cout << "\n[INFO] storing updated References\n";
 
 	std::ofstream storageFile;
 	storageFile.open(pathToFile);
@@ -69,7 +69,6 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 		}
 
 		// Close the file stream once all lines have been
-		// read.
 		streamFile.close();
 	}
 	else
@@ -77,13 +76,11 @@ std::unique_ptr<IfcParse::IfcFile> forcefullDelete(std::unique_ptr<IfcParse::Ifc
 		return false;
 	}
 	tempFile.close();
-	std::cout << delCount << " objects removed from file\n";
+	std::cout << delCount << " objects removed from file\n\n";
 
 	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
 	std::filesystem::remove(tempPath);
-
-	theFile = std::make_unique<IfcParse::IfcFile>(pathToFile.string());
-	return theFile;
+	return true;
 }
 
 std::vector<std::string> tokenizeString(const std::string& theString, const std::string& delimiters) {
@@ -183,7 +180,7 @@ void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
 	tempFile.close();
 	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
 	std::filesystem::remove(tempPath);
-	std::cout << "succes" << std::endl;
+	std::cout << "success" << std::endl;
 	return;
 }
 
@@ -280,11 +277,19 @@ bool hasGuid(IfcUtil::IfcBaseClass* baseClass)
 	return false;
 }
 
-std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::IfcFile> theFile, const std::filesystem::path& pathToFile, std::unordered_set<int>* toBeDeletedIndx = nullptr, int iteration = 1)
+bool collapseClasses(const std::filesystem::path& pathToFile, std::unique_ptr<IfcParse::IfcFile> theFile = nullptr, std::unordered_set<int>* toBeDeletedIndx = nullptr, int iteration = 1)
 {
 	int counter = 0;
 	std::ifstream inFile(pathToFile);
 	int lineCount = std::count(std::istreambuf_iterator<char>(inFile), std::istreambuf_iterator<char>(), '\n');
+
+	if (theFile == nullptr)
+	{
+		std::cout << "\nread file\n";
+		theFile = std::make_unique<IfcParse::IfcFile>(pathToFile.string());
+		if (!theFile->good()) { return false; }
+		std::cout << "file successfully read\n";
+	}
 
 	if (toBeDeletedIndx == nullptr)
 	{
@@ -339,8 +344,6 @@ std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::Ifc
 	std::cout << "[INFO] Updating References\n";
 	updateReference(fullBaseClassList, oldNewRefMap);
 	
-
-
 	for (auto remapPair : oldNewRefMap)
 	{
 		auto refs = theFile->instances_by_reference(remapPair.first);
@@ -352,21 +355,87 @@ std::unique_ptr<IfcParse::IfcFile> collapseClasses(std::unique_ptr<IfcParse::Ifc
 
 	if (currentDelSize != toBeDeletedIndx->size())
 	{
-		std::cout << "reduced objects to from " << counter << " to " << counter - toBeDeletedIndx->size() << std::endl;
+		std::cout << "reduced objects to from " << counter << " to " << counter - toBeDeletedIndx->size() << "\n";
 
 		iteration += 1;
-		theFile = collapseClasses(std::move(theFile), pathToFile, toBeDeletedIndx,  iteration);
-		iteration -= 1;
+		collapseClasses(pathToFile, std::move(theFile), toBeDeletedIndx,  iteration);
 	}
-
-	if (iteration == 1)
+	else
 	{
-		theFile = forcefullDelete(std::move(theFile), pathToFile, *toBeDeletedIndx);
+		forcefullDelete(std::move(theFile), pathToFile, *toBeDeletedIndx);
 		delete toBeDeletedIndx;
 		toBeDeletedIndx = nullptr;
 	}
-	
-	return theFile;
+	return true;
+}
+
+
+bool recalculateId(const std::filesystem::path& pathToFile)
+{
+	std::cout << "[INFO] recalcualating Ids\n";
+	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
+	std::map<std::string, std::string> remappedId;
+
+	std::string delimiters = "=";
+	std::ifstream streamFile(pathToFile);
+	int currentId = 1;
+
+	std::vector<std::string> fileStringVec;
+	if (streamFile.is_open()) {
+
+		std::string line;
+		while (std::getline(streamFile, line)) {
+			if (line[0] != '#') {
+				fileStringVec.emplace_back(line);
+				continue;
+			}
+			std::vector<std::string> tokenizedString = tokenizeString(line, delimiters);
+			std::string IdSubString = tokenizedString[0];
+
+			if (IdSubString[0] != '#') { continue; }
+
+			std::string indxString = "#" + std::to_string(currentId);
+			std::string correctedString = indxString;
+			remappedId.emplace(IdSubString, indxString);
+			currentId++;
+
+			for (size_t i = 1; i < tokenizedString.size(); i++)
+			{
+				correctedString += tokenizedString[i];
+			}
+			fileStringVec.emplace_back(correctedString);
+		}
+		streamFile.close();
+	}
+
+	delimiters = "(),";
+	std::ofstream tempFile(tempPath);
+	for (const std::string& line : fileStringVec)
+	{
+		if (line[0] != '#') {
+			tempFile << line << "\n";
+			continue;
+		}
+		std::vector<std::string> tokenizedString = tokenizeString(line, delimiters);
+		std::string correctedString = tokenizedString[0];
+		for (size_t i = 1; i < tokenizedString.size(); i++)
+		{
+			std::string currentSubString = tokenizedString[i];
+			if (remappedId.find(currentSubString) != remappedId.end())
+			{
+				currentSubString = remappedId.at(currentSubString);
+			}
+			correctedString += currentSubString;
+		}
+		tempFile << correctedString << "\n";
+		streamFile.close();
+	}
+	tempFile.close();
+	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
+	std::filesystem::remove(tempPath);
+	std::cout << "success" << std::endl;
+	return true;
+
 }
 
 bool isValidIfcFile(const std::filesystem::path& filePath)
@@ -458,19 +527,14 @@ int main(int argc, char* argv[])
 	int precisionPoint = 6;
 	roundFloats(filePath, 6);
 
-	std::cout << "\nread file\n";
-	std::unique_ptr<IfcParse::IfcFile> ifcFile = std::make_unique<IfcParse::IfcFile>(filePath.string());
-	ifcFile = std::make_unique<IfcParse::IfcFile>(filePath.string());
-	if (!ifcFile->good()) { return 1; }
-	std::cout << "file succesfully read\n";
-
-	ifcFile = collapseClasses(std::move(ifcFile), filePath);
+	collapseClasses(filePath);
+	recalculateId(filePath);
 
 	std::ofstream storageFile;
 	storageFile.open(outputPath);
 	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;
-	storageFile << *ifcFile;
-	std::cout << "[INFO] Exported succesfully" << std::endl;
+	std::filesystem::copy_file(localPath, outputPath, std::filesystem::copy_options::overwrite_existing);
+	std::cout << "[INFO] Exported successfully" << std::endl;
 	storageFile.close();
 
 	std::filesystem::remove(localPath);
