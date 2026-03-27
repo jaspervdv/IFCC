@@ -3,11 +3,16 @@
 <!-- markdownlint-disable MD033 -->
 <!-- markdownlint-disable MD034 -->
 
-IFCC is a simple console application that compresses IFC files. The implemented method is based on the method developed by [(Sun et al., 2016)](#1) but written from scratch. The application eliminates repeating objects that store identical data. Examples of these objects are IfcCartesianPoint, IfcDirection, and IfcPropertySingleValue. Any object that has a GUID is not touched. Additional compression is achieved by rounding floating values to 0.000001 meter if their precision is higher (0.000001 meter still smaller than the width of a human hair).
+IFCC is a simple console application that compresses IFC files. The implemented method is based on the method developed by [(Sun et al., 2016)](#1) but written from scratch and extended. The general processes of the compressor are:
+
+* Rounding of floating number values to 0.000001 meter if their precision is higher (0.000001 meter still smaller than the width of a human hair).
+* Eliminating redundant data by merging objects that encode identical data. Objects such as IfcCartesianPoint, IfcDirection, and IfcPropertySingleValue. Any object that has a GUID is not touched.
+* Restructuring the order in which objects are stored so that the most referenced objects are placed at the beginning of the file. This reduces the chance of large IDs being repeated often in referenced lists of other objects.
+* Recalculating object IDs so that the size of both the class IDs and their references are kept at a minimum.
 
 ![overview](./Images/overview.jpg "An example of the difference between a compressed and uncompressed IFC file")
 
-A visual example of the methodology can be seen below. This model (the [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)) represents a normal IFC file. The model uses multiple IfcQuantityArea objects to encode exactly the same data but for different windows: Area = 2.4 m<sup>2</sup>. All but a single object that encodes this data can be removed without losing data. In even a simple file thousands of these items can be collapsed into a single object. For this model 9830 different objects can be eliminated.
+A visual example of the main methodology can be seen below. This model (the [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)) represents a normal IFC file. The model uses multiple IfcQuantityArea objects to encode exactly the same data but for different windows: Area = 2.4 m<sup>2</sup>. All but a single object that encodes this data can be removed without losing data. In even a simple file thousands of these items can be collapsed into a single object. For this model 9830 different objects can be eliminated.
 
 ![uncompressed relationships](./Images/unCompressedQuan.jpg "An example of uncompressed relationships")
 
@@ -15,11 +20,11 @@ A visual example of the methodology can be seen below. This model (the [FZK Haus
 
 | IFC file name  | File size (MB) | Compressed file size (MB) | Reduction |
 |-|-|-|-|
-| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)  | 2.511  | 1.740  | 30.7% |
-| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)  | 10.679 | 6.437 | 39.7% |
-| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)  | 5.967 | 2.435 | 59.1% |
-| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 48.132 | 19.510 | 59.4% | 
-| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1)  | 334.627 | 72.906 | 78.2% |
+| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)  | 2.511  | 1.690  | 32.7% |
+| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)  | 10.679 | 2.450 | 77.1% |
+| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples)  | 5.967 | 2.303 | 60.4% |
+| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 18.812 | 70.4% | 
+| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1)  | 334.627 | 60.653 | 81.9% |
 
 Compression numbers of some publicly available datasets can be seen in the table above. A reduction of 30% is already a decent score considering how simple the logic of this application is. However, based on these examples the larger the file the more compression is achieved.
 

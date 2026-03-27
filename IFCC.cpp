@@ -1,5 +1,5 @@
 #define USE_IFC2x3
-#define programVersion "0.2.3"
+#define programVersion "0.3.0"
 
 #include <fstream>
 #include <iostream>
@@ -277,7 +277,20 @@ bool hasGuid(IfcUtil::IfcBaseClass* baseClass)
 	return false;
 }
 
-bool collapseClasses(const std::filesystem::path& pathToFile, std::unique_ptr<IfcParse::IfcFile> theFile = nullptr, std::unordered_set<int>* toBeDeletedIndx = nullptr, int iteration = 1)
+std::map<int, int> getIdRefCount(IfcParse::IfcFile* theFile)
+{
+	std::map<int, int> refMap;
+	for (auto fileIt = theFile->begin(); fileIt != theFile->end(); ++fileIt)
+	{
+		auto indxObjectPair = *fileIt;
+		int currentId = indxObjectPair.first;
+		refMap.emplace(currentId, theFile->instances_by_reference(currentId)->size());
+	}
+	return refMap;
+}
+
+
+std::map<int, int> collapseClasses(const std::filesystem::path& pathToFile, std::unique_ptr<IfcParse::IfcFile> theFile = nullptr, std::unordered_set<int>* toBeDeletedIndx = nullptr, int iteration = 1)
 {
 	int counter = 0;
 	std::ifstream inFile(pathToFile);
@@ -287,7 +300,7 @@ bool collapseClasses(const std::filesystem::path& pathToFile, std::unique_ptr<If
 	{
 		std::cout << "\nread file\n";
 		theFile = std::make_unique<IfcParse::IfcFile>(pathToFile.string());
-		if (!theFile->good()) { return false; }
+		if (!theFile->good()) { return std::map<int, int>(); }
 		std::cout << "file successfully read\n";
 	}
 
@@ -353,22 +366,105 @@ bool collapseClasses(const std::filesystem::path& pathToFile, std::unique_ptr<If
 		toBeDeletedIndx->emplace(remapPair.first);
 	}
 
+	std::map<int, int> IdRefMap;
 	if (currentDelSize != toBeDeletedIndx->size())
 	{
 		std::cout << "reduced objects to from " << counter << " to " << counter - toBeDeletedIndx->size() << "\n";
 
 		iteration += 1;
-		collapseClasses(pathToFile, std::move(theFile), toBeDeletedIndx,  iteration);
+		IdRefMap = collapseClasses(pathToFile, std::move(theFile), toBeDeletedIndx,  iteration);
 	}
 	else
 	{
+		IdRefMap = getIdRefCount(theFile.get());
 		forcefullDelete(std::move(theFile), pathToFile, *toBeDeletedIndx);
 		delete toBeDeletedIndx;
 		toBeDeletedIndx = nullptr;
 	}
-	return true;
+	return IdRefMap;
 }
 
+bool restructureFile(const std::filesystem::path& pathToFile, std::map<int, int> idRefCountMap) {
+	std::cout << "[INFO] restructure file\n";
+	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
+
+
+	std::string delimiters = "=";
+	std::ifstream streamFile(pathToFile);
+	int currentId = 1;
+
+	std::vector<std::string> fileStringVecHeader;
+	std::vector<std::string> fileStringVecFooter;
+	std::map<int, std::string> remappedId;
+	if (streamFile.is_open()) {
+
+		std::string line;
+		bool isHeader = true;
+		while (std::getline(streamFile, line)) {
+			if (line[0] != '#') {
+				if (isHeader)
+				{
+					fileStringVecHeader.emplace_back(line);
+				}
+				else
+				{
+					fileStringVecFooter.emplace_back(line);
+				}
+				continue;
+			}
+			isHeader = false;
+
+			std::string stringId = line.substr(0, line.find_first_of("="));
+
+			if (stringId.size() <= 1) { continue; }
+
+			int id = std::stoi(stringId.substr(1));
+			remappedId.emplace(id, line);
+		}
+		streamFile.close();
+	}
+
+	std::vector<std::pair<int, int>> vec(idRefCountMap.begin(), idRefCountMap.end());
+
+	// sort by occurrence (value), descending
+	std::sort(vec.begin(), vec.end(), [](const auto& a, const auto& b) {
+		return a.second > b.second;
+		});
+
+	// extract only the ids
+	std::vector<int> sortedIds;
+	sortedIds.reserve(vec.size());
+
+	for (const auto& [id, count] : vec) {
+		sortedIds.push_back(id);
+	}
+
+	std::ofstream tempFile(tempPath);
+	for (const std::string& line : fileStringVecHeader)
+	{
+		tempFile << line << "\n";
+	}
+
+	for (int currentId : sortedIds)
+	{
+		if (remappedId.find(currentId) == remappedId.end())
+		{
+			continue;
+		}
+		tempFile << remappedId[currentId] << "\n";
+	}
+
+	for (const std::string& line : fileStringVecFooter)
+	{
+		tempFile << line << "\n";
+	}
+
+	tempFile.close();
+	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
+	std::filesystem::remove(tempPath);
+	std::cout << "success" << std::endl;
+	return true;
+}
 
 bool recalculateId(const std::filesystem::path& pathToFile)
 {
@@ -526,8 +622,8 @@ int main(int argc, char* argv[])
 
 	int precisionPoint = 6;
 	roundFloats(filePath, 6);
-
-	collapseClasses(filePath);
+	std::map<int, int> idRefCountMap = collapseClasses(filePath);
+	restructureFile(filePath, idRefCountMap);
 	recalculateId(filePath);
 
 	std::ofstream storageFile;
