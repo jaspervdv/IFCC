@@ -1,88 +1,164 @@
 #define USE_IFC2x3
-#define programVersion "0.3.0"
+#define programVersion "0.4.0"
 
 #include <fstream>
 #include <iostream>
 #include <filesystem>
 #include <unordered_set>
+#include <unordered_map>
+#include <map>
+#include <string>
 
-#include <ifcparse/IfcFile.h>
-#include <ifcparse/utils.h>
-#include <ifcparse/IfcEntityInstanceData.h>
-#include <ifcparse/IfcHierarchyHelper.h>
+std::vector<std::string> tokenizeString(const std::string& theString, const std::string& delimiters);
 
-#include <boost/make_shared.hpp>
+struct IfcClass{
+	int id;
+	std::string classType;
+	bool hasGuid;
+	std::string data = "";
+};
 
-bool forcefullDelete(std::unique_ptr<IfcParse::IfcFile> theFile, std::filesystem::path pathToFile, std::unordered_set<int> toBeDeletedIdist)
-{
-	if (toBeDeletedIdist.empty()) 
-	{
-		std::cout << "no objects to delete" << std::endl; 
-		return true;
-	}
+class IfcFile {
+private:
+	std::string header_ = "";
+	std::string footer_ = "";
+	std::map<int, IfcClass*> classStructure_;
+	std::map<int, std::unique_ptr<IfcClass>> privateClassList_;
+public:
 
-	// store the data to the temp file path
-	std::cout << "\n[INFO] storing updated References\n";
+	IfcFile(const std::string& filePath) {
+		std::ifstream streamFile(filePath);
+		if (streamFile.is_open()) {
 
-	std::ofstream storageFile;
-	storageFile.open(pathToFile);
-	storageFile << *theFile;
-	storageFile.close();
+			std::string line;
 
-	// generate second temp file
-	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
-	std::ofstream tempFile(tempPath);
+			bool isHeader = true;
 
-	// open the file as generic file and delete lines ad id
-	std::ifstream streamFile(pathToFile);
-	int delCount = 0;
-	if (streamFile.is_open()) {
-		std::string line;
-		int currentDeleteLoc = 0;
-
-		while (std::getline(streamFile, line)) {
-			std::string stringId = line.substr(0, line.find("="));
-
-			if (stringId[0] != '#') { 
-				tempFile << line << "\n";
-				continue;
-			}
-			
-			int currentId = std::stoi(stringId.substr(1, stringId.size()));
-
-			bool ignore = false;
-			if (toBeDeletedIdist.find(currentId) != toBeDeletedIdist.end())
-			{
-				ignore = true;
-
-				delCount++;
-				if (delCount % 1000 == 0)
-				{
-					std::cout << delCount << " objects removed from file\r";
+			while (std::getline(streamFile, line)) {
+				if (line[0] != '#') {
+					if (isHeader) { header_ += line + "\n"; }
+					else { footer_ += line; }
+					continue;
 				}
-				continue;
-			}
-			if (!ignore)
-			{
-				tempFile << line << "\n";
+				isHeader = false;
+
+				int splitIndx = line.find_first_of("=");
+
+				std::string stringId = line.substr(0, splitIndx);
+				std::string stringData = line.substr(splitIndx + 1, line.length());
+				if (stringId.length() <= 1) { continue; }
+				if (stringData.length() <= 0) { continue; }
+				int id = std::stoi(stringId.substr(1));
+
+				if (stringData[0] == ' ')
+				{
+					stringData = stringData.substr(1);
+				}
+
+				std::pair<std::string, std::string> stringPair(stringData.substr(0, stringData.find_first_of("(")), stringData);
+
+				IfcClass currentClass{
+					id,
+					stringData.substr(0, stringData.find_first_of("(")),
+					false,
+					stringData
+				};
+				std::unique_ptr<IfcClass> uniqueClassPtr = std::make_unique<IfcClass>(currentClass);
+				classStructure_.emplace(id, uniqueClassPtr.get());
+				privateClassList_.emplace(id, std::move(uniqueClassPtr));
 			}
 		}
-
-		// Close the file stream once all lines have been
-		streamFile.close();
 	}
-	else
-	{
-		return false;
+
+	std::string getHeader() const { return header_; }
+	std::string getFooter() const { return footer_; }
+
+	void removeClass(int idx) {
+		classStructure_.erase(idx);
+		privateClassList_.erase(idx);
 	}
-	tempFile.close();
-	std::cout << delCount << " objects removed from file\n\n";
 
-	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
-	std::filesystem::remove(tempPath);
-	return true;
-}
+	void restructureFile(const std::map<int, int>& referenceMap) {
 
+		// update the object IDs
+		std::map<int, std::unique_ptr<IfcClass>> newPrivateClassList;
+		std::map<int, IfcClass*> newClassStructure;
+
+		for (const std::pair<int,int>& currentPair : referenceMap)
+		{
+			int oldId = currentPair.first;
+			int newId = currentPair.second;
+
+			std::unique_ptr<IfcClass> currentClass = std::move(privateClassList_[oldId]);
+			currentClass->id = newId;
+			newClassStructure.emplace(newId, currentClass.get());
+			newPrivateClassList.emplace(newId, std::move(currentClass));
+		}
+
+		privateClassList_ = std::move(newPrivateClassList);
+		classStructure_ = newClassStructure;
+
+		// update the reference IDS
+
+		std::string delimiters = "(),";
+
+		for (const std::pair<int, IfcClass*>& currentPair : classStructure_)
+		{
+			IfcClass* currentClass = currentPair.second;
+			std::string datastring = currentClass->data;
+
+			std::vector<std::string> tokenizedString = tokenizeString(datastring, delimiters);
+			std::string correctedString = tokenizedString[0];
+			for (size_t i = 1; i < tokenizedString.size(); i++)
+			{
+				std::string currentSubString = tokenizedString[i];
+				
+				if (currentSubString[0] != '#')
+				{
+					correctedString += currentSubString;
+					continue;
+				}
+				int id = std::stoi(currentSubString.substr(1));
+
+				if (referenceMap.find(id) != referenceMap.end())
+				{
+					currentSubString = "#" + std::to_string(referenceMap.at(id));
+				}
+				correctedString += currentSubString;
+			}
+			currentClass->data = correctedString;
+		}
+
+		return;
+	}
+
+	std::map<int, IfcClass*>::iterator begin() {
+		return classStructure_.begin();
+	}
+
+	std::map<int, IfcClass*>::iterator end() {
+		return classStructure_.end();
+	}
+
+	int classCount() const {
+		return classStructure_.size();
+	}
+
+	std::string dumptoString() const {
+		std::string dumpedString = header_ + "\n";
+
+		for (const std::pair<int, IfcClass*>& currentPair : classStructure_)
+		{
+			dumpedString += "#" + std::to_string(currentPair.first) + "=" + currentPair.second->data + "\n";
+		}
+		dumpedString += footer_;
+
+		return dumpedString;
+	}
+
+};
+
+/// returns a vector consisting out of all the elements that were split by the delimiters with the delimiters included in the vector
 std::vector<std::string> tokenizeString(const std::string& theString, const std::string& delimiters) {
 	std::vector<std::string> tokens;
 
@@ -104,6 +180,8 @@ std::vector<std::string> tokenizeString(const std::string& theString, const std:
 	return tokens;
 }
 
+/// check if string is num
+/// A num is any string value that consists completely out of digits or has a first char that is +, -, or . 
 bool stringIsNum(const std::string& theString)
 {
 	bool isFirst = true;
@@ -128,6 +206,7 @@ bool stringIsNum(const std::string& theString)
 	return true;
 }
 
+/// rounds the floats
 std::string roundStringFloats(const std::string& theString, int floatLength)
 {
 	size_t fPointLoc = theString.find_first_of('.');
@@ -141,55 +220,42 @@ std::string roundStringFloats(const std::string& theString, int floatLength)
 	return theString.substr(0, maxNumLength);
 }
 
-void roundFloats(const std::filesystem::path& pathToFile, int floatLength)
+void roundFloats(IfcFile& theFile, int floatLength)
 {
 	std::cout << "[INFO] round floating point values to " << 1 / pow(10, floatLength) << "\n";
-
-	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
-	std::ofstream tempFile(tempPath);
-
 	std::string delimiters = "(),";
 
 	// open the file as generic file and delete lines ad id
-	std::ifstream streamFile(pathToFile);
-	int delCount = 0;
-	if (streamFile.is_open()) {
+	for (auto fileIt = theFile.begin(); fileIt != theFile.end(); ++ fileIt)
+	{
+		std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
+		IfcClass* currentClass = currentIdClassPair.second;
 
-		std::string line;
-		while (std::getline(streamFile, line)) {
-			if (line[0] != '#') {
-				tempFile << line << "\n";
+		std::vector<std::string> tokenizedString = tokenizeString(currentClass->data, delimiters);
+		std::string correctedString = "";
+		for (const std::string& subString : tokenizedString)
+		{
+			if (!stringIsNum(subString))
+			{
+				correctedString += subString;
 				continue;
 			}
-			std::vector<std::string> tokenizedString = tokenizeString(line, delimiters);
-			
-			std::string correctedString = "";
-			for (const std::string& subString : tokenizedString)
-			{
-				if (!stringIsNum(subString))
-				{
-					correctedString += subString;
-					continue;
-				}
-				correctedString += roundStringFloats(subString, floatLength);
-			}
-			tempFile << correctedString << "\n";
+			correctedString += roundStringFloats(subString, floatLength);
 		}
-		streamFile.close();
+		currentClass->data = correctedString;
 	}
-	tempFile.close();
-	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
-	std::filesystem::remove(tempPath);
 	std::cout << "success" << std::endl;
 	return;
 }
 
-void updateReference(const std::set<IfcUtil::IfcBaseClass*>& baseClassList, const std::map<int, IfcUtil::IfcBaseClass*>& referenceMap)
+void updateReference(IfcFile& theFile, const std::map<int, int>& referenceMap)
 {
 	int counter = 0;
-	int totalLineCount = baseClassList.size();
+	int totalLineCount = theFile.classCount();
 
-	for (IfcUtil::IfcBaseClass* reference : baseClassList)
+	std::string delimiters = "(),";
+
+	for (auto fileIt = theFile.begin(); fileIt != theFile.end(); ++fileIt)
 	{
 		if (counter % 1000 == 0)
 		{
@@ -197,338 +263,161 @@ void updateReference(const std::set<IfcUtil::IfcBaseClass*>& baseClassList, cons
 		}
 		counter++;
 
-		IfcEntityInstanceData& referenceData = reference->data();
-		if (referenceMap.find(referenceData.id()) != referenceMap.end()) { continue; }
+		std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
+		int referenceIdx = currentIdClassPair.first;
+		if (referenceMap.find(referenceIdx) != referenceMap.end()) { continue; }
 
-		for (size_t i = 0; i < referenceData.getArgumentCount(); i++)
+		IfcClass* referenceClass = currentIdClassPair.second;
+		std::string referenceData = referenceClass->data;
+
+		std::vector<std::string> tokenizedRefData = tokenizeString(referenceData, delimiters);
+		std::string correctedDataString = "";
+		for (const std::string& currentToken : tokenizedRefData)
 		{
-			Argument* currentArgument = referenceData.getArgument(i);
-			IfcUtil::ArgumentType currentArgumentType = currentArgument->type();
-
-			if (currentArgumentType == IfcUtil::Argument_AGGREGATE_OF_ENTITY_INSTANCE)
+			if (currentToken.length() == 0) { continue; }
+			if (currentToken[0] != '#') 
 			{
-				aggregate_of_instance::ptr currentAggregate = currentArgument->operator aggregate_of_instance::ptr();
-				aggregate_of_instance::ptr newAggregate = boost::make_shared< aggregate_of_instance>();
-				newAggregate->reserve(currentAggregate->size());
-
-				bool isNew = false;
-				for (auto aggregateIt = currentAggregate->begin(); aggregateIt != currentAggregate->end(); ++aggregateIt)
-				{
-					IfcUtil::IfcBaseClass* argumentBaseclass = *aggregateIt;
-					int currentId = argumentBaseclass->data().id();
-
-					if (referenceMap.find(currentId) == referenceMap.end())
-					{
-						newAggregate->push(argumentBaseclass);
-						continue;
-					}
-					newAggregate->push(referenceMap.at(currentId));
-
-					isNew = true;
-				}
-				if (!isNew)
-				{
-					continue;
-				}
-
-				IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
-				writeArgument->set(newAggregate);
-
-				referenceData.setArgument(i, writeArgument);
+				correctedDataString += currentToken;
+				continue; 
 			}
-			else if (currentArgumentType == IfcUtil::Argument_ENTITY_INSTANCE)
+			int id = std::stoi(currentToken.substr(1));
+			if (referenceMap.find(id) == referenceMap.end())
 			{
-				IfcUtil::IfcBaseClass* argumentBaseclass = currentArgument->operator IfcUtil::IfcBaseClass * ();
-				int currentId = argumentBaseclass->data().id();
-
-				if (referenceMap.find(currentId) == referenceMap.end())
-				{
-					continue;
-				}
-				IfcWrite::IfcWriteArgument* writeArgument = new IfcWrite::IfcWriteArgument();
-
-				writeArgument->set(referenceMap.at(currentId));
-				referenceData.setArgument(i, writeArgument);
+				correctedDataString += currentToken;
+				continue;
 			}
+			correctedDataString += "#";
+			correctedDataString += std::to_string(referenceMap.at(id));
 		}
+
+		referenceClass->data = correctedDataString;
 	}
 	std::cout << "processing objects: " << counter << " (" << "100%)\n";
 	return;
 }
 
-bool hasGuid(IfcUtil::IfcBaseClass* baseClass)
-{
-	const IfcEntityInstanceData& currentDataItem = baseClass->data();
-
-	if (currentDataItem.getArgumentCount() == 0) { return false; }
-	Argument* currentFirstArg = currentDataItem.getArgument(0);
-	if (currentFirstArg->type() == IfcUtil::Argument_STRING)
-	{
-		std::string stringCurrentFirstArg = currentFirstArg->toString();
-		if (stringCurrentFirstArg.length() == 24)
-		{
-			if (stringCurrentFirstArg.find(" ") == 0)
-			{
-				return true;
-			}
-			return false;
-		}
-	}
-	return false;
-}
-
-std::map<int, int> getIdRefCount(IfcParse::IfcFile* theFile)
-{
-	std::map<int, int> refMap;
-	for (auto fileIt = theFile->begin(); fileIt != theFile->end(); ++fileIt)
-	{
-		auto indxObjectPair = *fileIt;
-		int currentId = indxObjectPair.first;
-		refMap.emplace(currentId, theFile->instances_by_reference(currentId)->size());
-	}
-	return refMap;
-}
-
-
-std::map<int, int> collapseClasses(const std::filesystem::path& pathToFile, std::unique_ptr<IfcParse::IfcFile> theFile = nullptr, std::unordered_set<int>* toBeDeletedIndx = nullptr, int iteration = 1)
+void collapseClasses(IfcFile& theFile, int iteration = 1)
 {
 	int counter = 0;
-	std::ifstream inFile(pathToFile);
-	int lineCount = std::count(std::istreambuf_iterator<char>(inFile), std::istreambuf_iterator<char>(), '\n');
+	int lineCount = theFile.classCount();
+	std::unordered_set<int> toBeDeletedIndx;
 
-	if (theFile == nullptr)
-	{
-		std::cout << "\nread file\n";
-		theFile = std::make_unique<IfcParse::IfcFile>(pathToFile.string());
-		if (!theFile->good()) { return std::map<int, int>(); }
-		std::cout << "file successfully read\n";
-	}
-
-	if (toBeDeletedIndx == nullptr)
-	{
-		toBeDeletedIndx = new std::unordered_set<int>();
-		toBeDeletedIndx->reserve(lineCount);
-	}
-
-	int currentDelSize = toBeDeletedIndx->size();
-	std::map<std::string, std::unordered_map<std::string, IfcUtil::IfcBaseClass*>> uniqueItemMap;
-	std::map<int, IfcUtil::IfcBaseClass*> oldNewRefMap;
-	std::set<IfcUtil::IfcBaseClass*> fullBaseClassList;
-	
 	std::cout << "\n[INFO] collapsing redundant classes, iteration: " << iteration << "\n";
 
-	for (auto fileIt = theFile->begin(); fileIt != theFile->end(); ++fileIt)
+	std::map<std::string, std::unordered_map<std::string, int>> uniqueItemMap;
+	std::map<int, int> oldNewRefMap;
+
+	for (auto fileIt = theFile.begin(); fileIt != theFile.end(); ++fileIt)
 	{
 		if (counter % 1000 == 0)
 		{
-			std::cout << "processing objects: " << counter << " (" << (counter * 100) /lineCount << "%)\r";
-		}	
+			std::cout << "processing objects: " << counter << " (" << (counter * 100) / lineCount << "%)\r";
+		}
 		counter++;
 
-		auto indxObjectPair = *fileIt;
-		int currentId = indxObjectPair.first;
+		std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
+		int currentId = currentIdClassPair.first;
 
-		if (toBeDeletedIndx->find(currentId) != toBeDeletedIndx->end()) { continue; }
-
-		IfcUtil::IfcBaseClass* currentItem = indxObjectPair.second;
-		fullBaseClassList.emplace(currentItem);
-
-		if (hasGuid(currentItem)) { continue; }
-		
-		std::string classStringRep = currentItem->data().toString();
-		std::string classType = currentItem->data().type()->name();
-		std::string dataClassComp = classStringRep.substr(classStringRep.find_first_of("("), classStringRep.size());
+		IfcClass* currentClass = currentIdClassPair.second;
+		std::string classType = currentClass->classType;
+		std::string classData = currentClass->data;
 
 		if (uniqueItemMap.find(classType) == uniqueItemMap.end())
 		{
-			std::unordered_map<std::string, IfcUtil::IfcBaseClass*> newMap;
-			newMap.emplace(dataClassComp, currentItem);
+			std::unordered_map<std::string, int> newMap;
+			newMap.emplace(classData, currentId);
 			uniqueItemMap.emplace(classType, newMap);
 			continue;
 		}
 
-		auto [storedPropertyKey, inserted] = uniqueItemMap[classType].emplace(dataClassComp, currentItem);
+		auto [storedPropertyKey, inserted] = uniqueItemMap[classType].emplace(classData, currentId);
 		if (inserted) { continue; }
 
-		IfcUtil::IfcBaseClass* uniqueItem = storedPropertyKey->second;
-		oldNewRefMap.emplace(currentId, uniqueItem);
+		oldNewRefMap.emplace(currentId, storedPropertyKey->second);
 	}
+
 	std::cout << "processing objects: " << counter << " (100%)\n";
 	std::cout << "[INFO] Updating References\n";
-	updateReference(fullBaseClassList, oldNewRefMap);
-	
+	updateReference(theFile, oldNewRefMap);
+
 	for (auto remapPair : oldNewRefMap)
 	{
-		auto refs = theFile->instances_by_reference(remapPair.first);
-		if (refs->size() != 0) {
-			continue;
-		}
-		toBeDeletedIndx->emplace(remapPair.first);
+		theFile.removeClass(remapPair.first);
 	}
 
 	std::map<int, int> IdRefMap;
-	if (currentDelSize != toBeDeletedIndx->size())
+	if (!oldNewRefMap.empty())
 	{
-		std::cout << "reduced objects to from " << counter << " to " << counter - toBeDeletedIndx->size() << "\n";
-
+		std::cout << "reduced objects to from " << counter << " to " << counter - oldNewRefMap.size() << "\n";
 		iteration += 1;
-		IdRefMap = collapseClasses(pathToFile, std::move(theFile), toBeDeletedIndx,  iteration);
+		collapseClasses(theFile, iteration);
+	}
+	return;
+}
+
+
+bool recalculateId(IfcFile& theFile, bool restructure)
+{
+	std::cout << "\n[INFO] recalcualating Ids\n";
+
+	std::map<int, int> remappedId;
+	if (restructure)
+	{
+		std::string delimiters = "(),";
+		std::map<int, int> pairIdOccuranceList;
+
+		for (auto fileIt = theFile.begin(); fileIt != theFile.end(); ++fileIt)
+		{
+			std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
+			int currentId = currentIdClassPair.first;
+			pairIdOccuranceList[currentId] = 0;
+		}
+
+		for (auto fileIt = theFile.begin(); fileIt != theFile.end(); ++fileIt)
+		{
+			std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
+			std::string classDataString = currentIdClassPair.second->data;
+
+			std::vector<std::string> tokenizedString = tokenizeString(classDataString, delimiters);
+
+			for (const std::string& currentToken : tokenizedString)
+			{
+				if (currentToken.length() == 0) { continue; }
+				if (currentToken[0] != '#') { continue; }
+				int id = std::stoi(currentToken.substr(1));
+				
+				if (pairIdOccuranceList.find(id) != pairIdOccuranceList.end()) 
+				{ 
+					pairIdOccuranceList[id] = pairIdOccuranceList[id] + 1; 
+				}
+			}
+		}
+
+		std::vector<std::pair<int, int>> sortedPairOccurance(pairIdOccuranceList.begin(), pairIdOccuranceList.end());
+
+		std::sort(sortedPairOccurance.begin(), sortedPairOccurance.end(), [](const auto& a, const auto& b) {
+			return a.second > b.second;
+			});
+
+		int currentId = 1;
+		for (const auto& [originId, count] : sortedPairOccurance) {
+			remappedId.emplace(originId, currentId);
+			currentId++;
+		}
 	}
 	else
 	{
-		IdRefMap = getIdRefCount(theFile.get());
-		forcefullDelete(std::move(theFile), pathToFile, *toBeDeletedIndx);
-		delete toBeDeletedIndx;
-		toBeDeletedIndx = nullptr;
-	}
-	return IdRefMap;
-}
-
-bool restructureFile(const std::filesystem::path& pathToFile, std::map<int, int> idRefCountMap) {
-	std::cout << "[INFO] restructure file\n";
-	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
-
-
-	std::string delimiters = "=";
-	std::ifstream streamFile(pathToFile);
-	int currentId = 1;
-
-	std::vector<std::string> fileStringVecHeader;
-	std::vector<std::string> fileStringVecFooter;
-	std::map<int, std::string> remappedId;
-	if (streamFile.is_open()) {
-
-		std::string line;
-		bool isHeader = true;
-		while (std::getline(streamFile, line)) {
-			if (line[0] != '#') {
-				if (isHeader)
-				{
-					fileStringVecHeader.emplace_back(line);
-				}
-				else
-				{
-					fileStringVecFooter.emplace_back(line);
-				}
-				continue;
-			}
-			isHeader = false;
-
-			std::string stringId = line.substr(0, line.find_first_of("="));
-
-			if (stringId.size() <= 1) { continue; }
-
-			int id = std::stoi(stringId.substr(1));
-			remappedId.emplace(id, line);
-		}
-		streamFile.close();
-	}
-
-	std::vector<std::pair<int, int>> vec(idRefCountMap.begin(), idRefCountMap.end());
-
-	// sort by occurrence (value), descending
-	std::sort(vec.begin(), vec.end(), [](const auto& a, const auto& b) {
-		return a.second > b.second;
-		});
-
-	// extract only the ids
-	std::vector<int> sortedIds;
-	sortedIds.reserve(vec.size());
-
-	for (const auto& [id, count] : vec) {
-		sortedIds.push_back(id);
-	}
-
-	std::ofstream tempFile(tempPath);
-	for (const std::string& line : fileStringVecHeader)
-	{
-		tempFile << line << "\n";
-	}
-
-	for (int currentId : sortedIds)
-	{
-		if (remappedId.find(currentId) == remappedId.end())
+		int currentId = 1;
+		for (auto fileIt = theFile.begin(); fileIt != theFile.end(); ++fileIt)
 		{
-			continue;
-		}
-		tempFile << remappedId[currentId] << "\n";
-	}
-
-	for (const std::string& line : fileStringVecFooter)
-	{
-		tempFile << line << "\n";
-	}
-
-	tempFile.close();
-	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
-	std::filesystem::remove(tempPath);
-	std::cout << "success" << std::endl;
-	return true;
-}
-
-bool recalculateId(const std::filesystem::path& pathToFile)
-{
-	std::cout << "[INFO] recalcualating Ids\n";
-	std::filesystem::path tempPath = pathToFile.parent_path().string() + "/" + pathToFile.stem().string() + std::string("_2") + pathToFile.extension().string();
-	std::map<std::string, std::string> remappedId;
-
-	std::string delimiters = "=";
-	std::ifstream streamFile(pathToFile);
-	int currentId = 1;
-
-	std::vector<std::string> fileStringVec;
-	if (streamFile.is_open()) {
-
-		std::string line;
-		while (std::getline(streamFile, line)) {
-			if (line[0] != '#') {
-				fileStringVec.emplace_back(line);
-				continue;
-			}
-			std::vector<std::string> tokenizedString = tokenizeString(line, delimiters);
-			std::string IdSubString = tokenizedString[0];
-
-			if (IdSubString[0] != '#') { continue; }
-
-			std::string indxString = "#" + std::to_string(currentId);
-			std::string correctedString = indxString;
-			remappedId.emplace(IdSubString, indxString);
+			std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
+			int originId = currentIdClassPair.first;
+			remappedId.emplace(originId, currentId);
 			currentId++;
-
-			for (size_t i = 1; i < tokenizedString.size(); i++)
-			{
-				correctedString += tokenizedString[i];
-			}
-			fileStringVec.emplace_back(correctedString);
 		}
-		streamFile.close();
 	}
+	theFile.restructureFile(remappedId);
 
-	delimiters = "(),";
-	std::ofstream tempFile(tempPath);
-	for (const std::string& line : fileStringVec)
-	{
-		if (line[0] != '#') {
-			tempFile << line << "\n";
-			continue;
-		}
-		std::vector<std::string> tokenizedString = tokenizeString(line, delimiters);
-		std::string correctedString = tokenizedString[0];
-		for (size_t i = 1; i < tokenizedString.size(); i++)
-		{
-			std::string currentSubString = tokenizedString[i];
-			if (remappedId.find(currentSubString) != remappedId.end())
-			{
-				currentSubString = remappedId.at(currentSubString);
-			}
-			correctedString += currentSubString;
-		}
-		tempFile << correctedString << "\n";
-		streamFile.close();
-	}
-	tempFile.close();
-	std::filesystem::copy_file(tempPath, pathToFile, std::filesystem::copy_options::overwrite_existing);
-	std::filesystem::remove(tempPath);
 	std::cout << "success" << std::endl;
 	return true;
 
@@ -608,32 +497,28 @@ int main(int argc, char* argv[])
 {
 	std::filesystem::path filePath = "";
 	std::filesystem::path outputPath = "";
-	std::filesystem::path localPath = std::filesystem::path("./temp.ifc");
 
 	printDefaultstartInfo();
-
 	if (!getUserInput(argc, argv, &filePath, &outputPath)) { return 0; }
 
 	std::cout << "\nInput path: " << filePath.string() << "\n";
-	std::cout << "Output path: " << outputPath.string() << "\n\n";
+	std::cout << "Output path: " << outputPath.string() << "\n";
 
-	std::filesystem::copy(filePath, localPath, std::filesystem::copy_options::overwrite_existing);
-	filePath = localPath;
+	std::cout << "\n[INFO] read file\n";
+	IfcFile theFile = IfcFile(filePath.string());
+	std::cout << "file successfully read\n\n";
 
 	int precisionPoint = 6;
-	roundFloats(filePath, 6);
-	std::map<int, int> idRefCountMap = collapseClasses(filePath);
-	restructureFile(filePath, idRefCountMap);
-	recalculateId(filePath);
+	roundFloats(theFile, 6);
+	collapseClasses(theFile);
+	recalculateId(theFile, true);
 
 	std::ofstream storageFile;
 	storageFile.open(outputPath);
 	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;
-	std::filesystem::copy_file(localPath, outputPath, std::filesystem::copy_options::overwrite_existing);
+	storageFile << theFile.dumptoString();
 	std::cout << "[INFO] Exported successfully" << std::endl;
 	storageFile.close();
-
-	std::filesystem::remove(localPath);
 
 	return 0;
 }
