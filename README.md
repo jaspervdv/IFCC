@@ -32,7 +32,7 @@ Even the size of Strijp S model of 334MB drops well below the 100MB threshold fo
 
 ## How to use
 
-IFCC works as a simple console application. It takes 2 input variables: an input path and an optional output path. If only the input path is supplied the tool will store the compressed file at the folder of the input path with the filename being the same except for the addition of "_compressed". It will show the same behavior if in the explorer an IFC file is dragged into the executable.
+The pre-compiled windows executable can be downloaded from the [releases page](https://github.com/jaspervdv/IFCC/releases). The executable work as a simple console application. It takes 2 input variables: an input path and an optional output path. If only the input path is supplied the tool will store the compressed file at the folder of the input path with the filename being the same except for the addition of "_compressed". It will show the same behavior if in the explorer an IFC file is dragged into the executable.
 
 Current supported IFC versions:
 
@@ -47,18 +47,13 @@ Unlike the [IfcEnvelopeExtractor](https://github.com/tudelft3d/IFC_BuildingEnvEx
 
 ## How to build
 
-If it is desired to compile the code locally the following libraries are required:
+Recent versions of the code do not rely on any library except for the standard ones. This will make local compiling easier.
 
-* [IfcOpenShell 0.7](http://ifcopenshell.org/)
-* [Boost](https://www.boost.org/)
-
-Boost is supplied with IfcOpenShell.
-
-The release version is build utilizing the final push of 0.7.
+Old versions of the code are depended on [IfcOpenShell 0.7](http://ifcopenshell.org/) and [Boost](https://www.boost.org/).
 
 ## Future development
 
-Currently the tool is not fast. Many optimizations can still be found. This is a proof of concept and not a commercial application.
+Currently the application always does a full compression. In the future options will be added to exclude and finetune certain processes.
 
 At this moment this tool only looks at a small cluster of class objects. Potentially it would be interesting to see how much extra compression could be achieved if similar identical geometric objects could be merged to single objects with different translations.
 
