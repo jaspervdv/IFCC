@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <filesystem>
 #include <unordered_set>
 #include <unordered_map>
@@ -209,15 +210,16 @@ bool stringIsNum(const std::string& theString)
 /// rounds the floats
 std::string roundStringFloats(const std::string& theString, int floatLength)
 {
-	size_t fPointLoc = theString.find_first_of('.');
+	std::stringstream stream;
+	stream << std::fixed << std::setprecision(floatLength) << std::stod(theString);
 
-	int maxNumLength = fPointLoc + floatLength + 1;
+	std::string roundedFloat = stream.str();
 
-	if (theString.size() <= maxNumLength)
-	{
-		return theString;
-	}
-	return theString.substr(0, maxNumLength);
+	size_t end = roundedFloat.find_last_not_of('0');
+	if (end != std::string::npos)
+		roundedFloat.erase(end + 1);
+
+	return roundedFloat;
 }
 
 void roundFloats(IfcFile& theFile, int floatLength)
