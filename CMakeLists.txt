@@ -31,7 +31,18 @@ FetchContent_MakeAvailable(minizip)
 
 # Executable
 add_executable(${PROJECT_NAME} 
-IFCC.cpp
+src/IFCC.cpp
+src/IfcClass.cpp
+src/IfcFile.cpp
+include/IfcClass.hpp
+include/IfcFile.hpp
+)
+
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        src
+    PUBLIC
+        include
 )
 
 # Link
