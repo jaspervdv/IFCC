@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD033 -->
 <!-- markdownlint-disable MD034 -->
 
-IFCC is a simple console application that compresses IFC and IFCZIP (from upcoming v0.5.0 onward) files. The tool allows both IFC and IFCZIP output. IFCZIP allows for more compression but will use the IFCZIP encoding which might not be supported by all applications. The general processes of the compressor are:
+IFCC is a console application that compresses IFC and IFCZIP (from upcoming v0.5.0 onward) files. The tool allows both IFC and IFCZIP output. IFCZIP allows for more compression but will use the IFCZIP encoding which might not be supported by all applications. The general processes of the compressor are:
 
 * Rounding of floating number values to 0.000001 meter if their precision is higher (0.000001 meter still smaller than the width of a human hair).
 * Eliminating redundant data by merging objects that encode identical data. Objects such as IfcCartesianPoint, IfcDirection, and IfcPropertySingleValue. Any object that has a GUID is not touched. This sub-process is based on the method developed by [(Sun et al., 2016)](#1) but rewritten from scratch
@@ -34,9 +34,20 @@ Even the size of Strijp S model of 334MB drops well below the 100MB threshold fo
 
 ## How to use
 
-The pre-compiled windows executable can be downloaded from the [releases page](https://github.com/jaspervdv/IFCC/releases). The executable works as a simple console application. It takes 2 input variables: an input path and an optional output path. If only the input path is supplied the tool will store the compressed file at the folder of the input path with the filename being the same except for the addition of "_compressed". It will show the same behavior if in the explorer an IFC file is dragged into the executable.
+The pre-compiled windows executable can be downloaded from the [releases page](https://github.com/jaspervdv/IFCC/releases). The executable works as a console application. The minimal input required to run the application is an input path. The input path can belong to an IFC or an IFCZIP file. If only an input path is supplied the tool will run a full compression and store the compressed file at the folder of the input path with the filename being the same except for the addition of "_compressed". This behavior is also shown if an IFC or IFCZIP file is dragged onto the .exe in the folder explorer.
 
-If the output file path ends with .ifc a compressed IFC file will be created. If the output file path ends with .ifczip a compressed IFCZIP file will be created (from upcoming v0.5.0 onward). This is not case sensitive. 
+Optionally an output path can be supplied as a second path. If an output path is supplied the compressed file will be stored at this location. And output path can be .ifc or .ifczip depending on if normal IFC output or if further compression to ZIP is desired. If the output file path ends with .ifc a compressed IFC file will be created. If the output file path ends with .ifczip a compressed IFCZIP file will be created. This is not case sensitive.
+
+The tool also exposes other settings:
+
+* Decimal size:
+  * "--deciN"
+  * N is the desired decimal size in the file. E.g. 4 => 0.0001, 6 => 0.000001. The smaller the decimal size the more compression can be achieved at the cost of reduced accuracy
+  * Default value = 6
+* Max iteration number:
+  * "--imaxN"
+  * N is the desired max iteration cycle that the tool is allowed to run. The lower this number the faster the processing at the cost of reduced compression
+  * Default value = ∞
 
 Unlike earlier developed IFC related projects by me (such as the [IfcEnvelopeExtractor](https://github.com/tudelft3d/IFC_BuildingEnvExtractor)) the single IFCC executable can process all IFC versions.
 
