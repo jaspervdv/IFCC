@@ -11,6 +11,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 struct UserSettings {
 	int floatPrecision = 6;
