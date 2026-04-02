@@ -1,5 +1,5 @@
 #define USE_IFC2x3
-#define programVersion "0.4.0"
+#define programVersion "0.5.0"
 
 #include <IfcFile.hpp>
 #include <IfcClass.hpp>
@@ -11,6 +11,10 @@
 #include <map>
 #include <string>
 #include <vector>
+
+struct UserSettings {
+	int floatPrecision = 6;
+};
 
 bool isValidIfcFile(const std::filesystem::path& filePath, bool isOutputPath = false)
 {
@@ -47,10 +51,18 @@ void printDefaultstartInfo() {
 void helpOutput() {
 	std::cout << "Usage: IFCC.exe 'IFC/IFCZIP target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
 	std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
+	std::cout << "Settings: \n\n";
+	std::cout << "'--Pn'      set decimal size where n = an int for the size \n";
+}
+
+bool isPath(const std::string& currentString) {
+	std::filesystem::path path = currentString;
+
+	return path.has_filename() & path.has_extension();
 }
 
 
-bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::filesystem::path* outputPath)
+bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::filesystem::path* outputPath, UserSettings* userSettings)
 {
 	if (argc <= 1)
 	{
@@ -74,12 +86,46 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	*outputPath = "";
 	if (argc > 2)
 	{
-		*outputPath = std::string(argv[2]);
-		if (!std::filesystem::exists(outputPath->parent_path()))
+		for (size_t i = 2; i < argc; i++)
 		{
-			std::cout << "invalid IFC output path\nUse --help for readme\n";
+			std::string currentArg = std::string(argv[i]);
+
+			// check if it is a valid file format
+			if (currentArg[0] != ' - ' && isPath(currentArg))
+			{
+				std::filesystem::path outputPathInput = std::string(argv[i]);
+				if (std::filesystem::exists(outputPathInput.parent_path()))
+				{
+					*outputPath = outputPathInput;
+					continue;		
+				}
+				std::cout << "invalid IFC output path\nUse --help for readme\n";
+				return false;
+			}
+			if (currentArg.size() > 3)
+			{
+				std::string settingType = currentArg.substr(0, 3);
+
+				if (settingType == "--p")
+				{
+					try
+					{
+						userSettings->floatPrecision = std::stoi(currentArg.substr(3, currentArg.size() - 3));
+						continue;
+					}
+					catch (const std::exception&)
+					{
+						// just do nothing
+					}
+				}
+			}	
+
+			std::cout << "Item '" << currentArg << "'is not reconized";;
+			std::cout << "\nUse --help for readme\n";
+			return false;
 		}
 	}
+
 	if (*filePath == *outputPath)
 	{
 		std::cout << "Input path is same as output path\n not allowed\n";
@@ -97,6 +143,8 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 			return false;
 		}
 	}
+
+
 	return true;
 }
 
@@ -106,7 +154,9 @@ int main(int argc, char* argv[])
 	std::filesystem::path outputPath = "";
 
 	printDefaultstartInfo();
-	if (!getUserInput(argc, argv, &filePath, &outputPath)) { return 0; }
+
+	UserSettings userSettings;
+	if (!getUserInput(argc, argv, &filePath, &outputPath, &userSettings)) { return 0; }
 
 	std::cout << "\nInput path: " << filePath.string() << "\n";
 	std::cout << "Output path: " << outputPath.string() << "\n";
@@ -116,8 +166,7 @@ int main(int argc, char* argv[])
 	if (!theFile.isGood()) { return 0; }
 	std::cout << "file successfully read\n\n";
 
-	int precisionPoint = 6;
-	theFile.roundFloats(precisionPoint);
+	theFile.roundFloats(userSettings.floatPrecision);
 	theFile.collapseClasses();
 	theFile.recalculateId(true);
 
