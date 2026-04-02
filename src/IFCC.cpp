@@ -14,6 +14,7 @@
 
 struct UserSettings {
 	int floatPrecision = 6;
+	int maxItertation = -1;
 };
 
 bool isValidIfcFile(const std::filesystem::path& filePath, bool isOutputPath = false)
@@ -52,7 +53,8 @@ void helpOutput() {
 	std::cout << "Usage: IFCC.exe 'IFC/IFCZIP target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
 	std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
 	std::cout << "Settings: \n\n";
-	std::cout << "'--Pn'      set decimal size where n = an int for the size \n";
+	std::cout << "'--deciN'      set decimal size where N = an int for the size \n";
+	std::cout << "'--imaxN'      set iteration cycle max where N = an int for the max iteration cycle \n";
 }
 
 bool isPath(const std::string& currentString) {
@@ -97,28 +99,31 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 				if (std::filesystem::exists(outputPathInput.parent_path()))
 				{
 					*outputPath = outputPathInput;
-					continue;		
+					continue;
 				}
 				std::cout << "invalid IFC output path\nUse --help for readme\n";
 				return false;
 			}
-			if (currentArg.size() > 3)
-			{
-				std::string settingType = currentArg.substr(0, 3);
 
-				if (settingType == "--p")
+			if (currentArg.find("--deci") != std::string::npos)
+			{
+				try
 				{
-					try
-					{
-						userSettings->floatPrecision = std::stoi(currentArg.substr(3, currentArg.size() - 3));
-						continue;
-					}
-					catch (const std::exception&)
-					{
-						// just do nothing
-					}
+					userSettings->floatPrecision = std::stoi(currentArg.substr(6, currentArg.size() - 6));
+					continue;
 				}
-			}	
+				catch (const std::exception&) {}
+			}
+
+			if (currentArg.find("--imax") != std::string::npos)
+			{
+				try
+				{
+					userSettings->maxItertation = std::stoi(currentArg.substr(6, currentArg.size() - 6));
+					continue;
+				}
+				catch (const std::exception&) { }
+			}
 
 			std::cout << "Item '" << currentArg << "'is not reconized";;
 			std::cout << "\nUse --help for readme\n";
@@ -167,7 +172,7 @@ int main(int argc, char* argv[])
 	std::cout << "file successfully read\n\n";
 
 	theFile.roundFloats(userSettings.floatPrecision);
-	theFile.collapseClasses();
+	theFile.collapseClasses(userSettings.maxItertation);
 	theFile.recalculateId(true);
 
 	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;

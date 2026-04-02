@@ -251,7 +251,7 @@ void IfcFile::updateReference(const std::map<int, int>& referenceMap)
 	return;
 }
 
-void IfcFile::collapseClasses(int iteration)
+void IfcFile::collapseClasses(int maxIt, int iteration)
 {
 	int counter = 0;
 	int lineCount = getClassCount();
@@ -301,11 +301,11 @@ void IfcFile::collapseClasses(int iteration)
 	}
 
 	std::map<int, int> IdRefMap;
-	if (!oldNewRefMap.empty())
+	if (!oldNewRefMap.empty() && maxIt != iteration)
 	{
 		std::cout << "reduced objects to from " << counter << " to " << counter - oldNewRefMap.size() << "\n";
 		iteration += 1;
-		collapseClasses(iteration);
+		collapseClasses(maxIt, iteration);
 	}
 	return;
 }

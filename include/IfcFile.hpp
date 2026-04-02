@@ -50,7 +50,7 @@ public:
 	void updateReference(const std::map<int, int>& referenceMap);
 
 	/// removes redundant classes and updates the references to not be dangling
-	void collapseClasses(int iteration = 1);
+	void collapseClasses(int maxIt, int iteration = 1);
 
 	/// recalculate the ID so that the first object is 1 and every net ID is +1 of the one before 
 	bool recalculateId(bool restructure);
