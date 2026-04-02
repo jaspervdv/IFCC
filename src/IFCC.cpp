@@ -45,8 +45,8 @@ void printDefaultstartInfo() {
 }
 
 void helpOutput() {
-	std::cout << "Usage: IFCC.exe 'IFC target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
-	//std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
+	std::cout << "Usage: IFCC.exe 'IFC/IFCZIP target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
+	std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
 }
 
 
@@ -65,7 +65,7 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	}
 
 	*filePath = std::string(argv[1]);
-	if (!isValidIfcFile(*filePath))
+	if (!isValidIfcFile(*filePath, true))
 	{
 		std::cout << "invalid IFC input path\nUse --help for readme\n";
 		return false;
@@ -113,6 +113,7 @@ int main(int argc, char* argv[])
 
 	std::cout << "\n[INFO] read file\n";
 	IfcFile theFile = IfcFile(filePath.string());
+	if (!theFile.isGood()) { return 0; }
 	std::cout << "file successfully read\n\n";
 
 	int precisionPoint = 6;

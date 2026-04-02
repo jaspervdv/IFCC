@@ -23,8 +23,43 @@ bool IfcFile::pathIsZip(const std::filesystem::path& filePath)
 	return false;
 }
 
-std::ifstream IfcFile::unZip(const std::string& filepath) {
-	return {};
+std::istringstream  IfcFile::unZip(const std::string& filepath)
+{
+	void* file_stream = mz_stream_os_create();
+	mz_stream_open(file_stream, filepath.c_str(), MZ_OPEN_MODE_READ);
+
+	void* zip_handle = mz_zip_create();
+	mz_zip_open(zip_handle, file_stream, MZ_OPEN_MODE_READ);
+
+	// Go to first entry (or locate by name)
+	mz_zip_goto_first_entry(zip_handle);
+
+	mz_zip_file* file_info = nullptr;
+	mz_zip_entry_get_info(zip_handle, &file_info);
+
+	if (mz_zip_entry_read_open(zip_handle, 0, nullptr) != MZ_OK) {
+		return {};
+	}
+
+	std::filesystem::path inputPath = file_info->filename;
+	std::string pathExtension = inputPath.extension().string();
+	std::transform(pathExtension.begin(), pathExtension.end(), pathExtension.begin(), ::toupper);
+	if (pathExtension != ".IFC") { return {}; }
+
+	std::vector<char> buffer(file_info->uncompressed_size);
+
+	int32_t bytesRead = mz_zip_entry_read(zip_handle, buffer.data(), buffer.size());
+
+	mz_zip_entry_close(zip_handle);
+	mz_zip_close(zip_handle);
+	mz_zip_delete(&zip_handle);
+
+	mz_stream_close(file_stream);
+	mz_stream_delete(&file_stream);
+
+	std::string content(buffer.begin(), buffer.end());
+	std::istringstream stream(content);
+	return stream;
 }
 
 void IfcFile::storeFileZip(const std::filesystem::path& outputPath)
@@ -61,7 +96,6 @@ void IfcFile::storeFileZip(const std::filesystem::path& outputPath)
 	mz_zip_entry_close(zip_handle);
 	mz_zip_close(zip_handle);
 	mz_zip_delete(&zip_handle);
-
 	mz_stream_close(file_stream);
 	mz_stream_delete(&file_stream);
 
@@ -81,57 +115,64 @@ void IfcFile::storeFileIFC(const std::filesystem::path& outputPath)
 
 IfcFile::IfcFile(const std::string& filePath) {
 
-	std::ifstream streamFile;
-	if (pathIsZip(filePath))
+	std::istringstream streamFile;
+	if (pathIsZip(filePath)) { streamFile = unZip(filePath); }
+	else 
 	{
-		streamFile = unZip(filePath);
+		std::ifstream file(filePath);
+		std::string content((std::istreambuf_iterator<char>(file)),
+			std::istreambuf_iterator<char>());
+		streamFile = std::istringstream(content);
 	}
-	else
+
+	if (streamFile.peek() == std::char_traits<char>::eof())
 	{
-		streamFile = std::ifstream(filePath);
+		std::cout << "unable to read date from file" << std::endl;
+		return;
 	}
 
-	if (streamFile.is_open()) {
-
-		std::string line;
-
-		bool isHeader = true;
-
-		while (std::getline(streamFile, line)) {
-			if (line[0] != '#') {
-				if (isHeader) { header_ += line + "\n"; }
-				else { footer_ += line; }
-				continue;
-			}
-			isHeader = false;
-
-			int splitIndx = line.find_first_of("=");
-
-			std::string stringId = line.substr(0, splitIndx);
-			std::string stringData = line.substr(splitIndx + 1, line.length());
-			if (stringId.length() <= 1) { continue; }
-			if (stringData.length() <= 0) { continue; }
-			int id = std::stoi(stringId.substr(1));
-
-			if (stringData[0] == ' ')
-			{
-				stringData = stringData.substr(1);
-			}
-
-			std::pair<std::string, std::string> stringPair(stringData.substr(0, stringData.find_first_of("(")), stringData);
-
-			IfcClass currentClass(
-				id,
-				stringData.substr(0, stringData.find_first_of("(")),
-				false,
-				stringData
-			);
-
-			std::unique_ptr<IfcClass> uniqueClassPtr = std::make_unique<IfcClass>(currentClass);
-			classStructure_.emplace(id, uniqueClassPtr.get());
-			privateClassList_.emplace(id, std::move(uniqueClassPtr));
+	bool isHeader = true;
+	std::string line;
+	while (std::getline(streamFile, line)) {
+		if (line[0] != '#') {
+			if (isHeader) { header_ += line + "\n"; }
+			else { footer_ += line; }
+			continue;
 		}
+		isHeader = false;
+
+		int splitIndx = line.find_first_of("=");
+
+		std::string stringId = line.substr(0, splitIndx);
+		std::string stringData = line.substr(splitIndx + 1, line.length());
+		if (stringId.length() <= 1) { continue; }
+		if (stringData.length() <= 0) { continue; }
+		int id = std::stoi(stringId.substr(1));
+
+		if (stringData[0] == ' ')
+		{
+			stringData = stringData.substr(1);
+		}
+
+		std::pair<std::string, std::string> stringPair(stringData.substr(0, stringData.find_first_of("(")), stringData);
+
+		IfcClass currentClass(
+			id,
+			stringData.substr(0, stringData.find_first_of("(")),
+			false,
+			stringData
+		);
+
+		std::unique_ptr<IfcClass> uniqueClassPtr = std::make_unique<IfcClass>(currentClass);
+		classStructure_.emplace(id, uniqueClassPtr.get());
+		privateClassList_.emplace(id, std::move(uniqueClassPtr));
 	}
+
+	if (classStructure_.size () == privateClassList_.size() != 0)
+	{
+		isGood_ = true;
+	}
+	return;
 }
 
 

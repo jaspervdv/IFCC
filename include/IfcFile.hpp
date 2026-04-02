@@ -13,12 +13,13 @@ private:
 	std::string footer_ = "";
 	std::map<int, IfcClass*> classStructure_;
 	std::map<int, std::unique_ptr<IfcClass>> privateClassList_;
+	bool isGood_ = false;
 
 	/// checks if filesystem path has an IFCZIP extension
 	bool pathIsZip(const std::filesystem::path& filePath);
 
 	/// unzippes an IFCZIP file and casts it to ifstream
-	std::ifstream unZip(const std::string& filePaht);
+	std::istringstream unZip(const std::string& filePaht);
 
 	/// Zippes a file and stores it at the outputpath
 	void storeFileZip(const std::filesystem::path& outputPath);
@@ -59,6 +60,8 @@ public:
 
 	/// stores the file at the specified output path
 	void storeFile(const std::filesystem::path& outputPath);
+
+	bool isGood() { return isGood_; }
 };
 
 #endif
