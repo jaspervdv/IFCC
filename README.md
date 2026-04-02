@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD033 -->
 <!-- markdownlint-disable MD034 -->
 
-IFCC is a console application that compresses IFC and IFCZIP (from upcoming v0.5.0 onward) files. The tool allows both IFC and IFCZIP output. IFCZIP allows for more compression but will use the IFCZIP encoding which might not be supported by all applications. The general processes of the compressor are:
+IFCC is a console application that compresses IFC and IFCZIP files. The tool allows both IFC and IFCZIP output. IFCZIP allows for more compression but will use the IFCZIP encoding which might not be supported by all applications. The general processes of the compressor are:
 
 * Rounding of floating number values to 0.000001 meter if their precision is higher (0.000001 meter still smaller than the width of a human hair).
 * Eliminating redundant data by merging objects that encode identical data. Objects such as IfcCartesianPoint, IfcDirection, and IfcPropertySingleValue. Any object that has a GUID is not touched. This sub-process is based on the method developed by [(Sun et al., 2016)](#1) but rewritten from scratch
@@ -26,7 +26,7 @@ A visual example of the redundancy removal methodology can be seen below. This m
 | [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 18.548 (29.2%) | 3.685 (5.8%)| 
 | [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1)  | 333.941 | 60.004 (18.0%) | 14.494 (4.3%) |
 
-*The IFCZIP files are compressed by IFCC and stored in the IFCZIP encoding (Feature will be added in upcoming v0.5.0).
+*The IFCZIP files are compressed by IFCC and stored in the IFCZIP encoding.
 
 Compression numbers of some publicly available datasets can be seen in the table above. A reduction of 30% is already a decent score considering how simple the logic of this application is. However, more compression can be achieved even without zipping.
 
@@ -67,7 +67,7 @@ At this moment IFCC processes the file as a (almost) flat text file. It would be
 
 **What is the difference between IFCC processed IFC files and normal IFCZIP files?**
 
-IFCC achieves compression by restructuring an IFC file and removing redundant data. Zipping an IFC file reduces the size of an IFC file by changing the encoding. In general IFCZIP files are smaller than IFCC processed IFC files. However, IFCZIP is not supported by all the applications that do support IFC files. IFCC does also support IFCZIP file output (from upcoming v0.5.0 onward). This combines the processes of IFCC and ZIP for even further file size reductions. An IFCC created IFCZIP file will occupy noticeably less memory than a "normal" IFCZIP files. Some examples can be seen below.
+IFCC achieves compression by restructuring an IFC file and removing redundant data. Zipping an IFC file reduces the size of an IFC file by changing the encoding. In general IFCZIP files are smaller than IFCC processed IFC files. However, IFCZIP is not supported by all the applications that do support IFC files. IFCC does also support IFCZIP file output. This combines the processes of IFCC and ZIP for even further file size reductions. An IFCC created IFCZIP file will occupy noticeably less memory than a "normal" IFCZIP files. Some examples can be seen below.
 
 | IFC file name  | File size (MB) | Compressed IFCZIP file size (MB) | IFCC compressed IFCZIP file size (MB) |
 |-|-|-|-|
