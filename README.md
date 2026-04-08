@@ -30,7 +30,7 @@ A visual example of the redundancy removal methodology can be seen below. This m
 
 *The IFCZIP files are compressed by IFCC and stored in the IFCZIP encoding.
 
-** The Fragments files are IFCC compressed IFC files which are converted to Fragments files by another application with all attributes and relations processed. Fragment I/O is not directly supported by IFCC.
+** The Fragments files are IFCC compressed IFC files stored in the Fragments encoding.
 
 Compression numbers of some publicly available datasets can be seen in the table above. A reduction of 30% is already a decent score considering how simple the logic of this application is. However, more compression can be achieved even without zipping.
 
@@ -55,11 +55,17 @@ The tool also exposes other settings:
 
 Unlike earlier developed IFC related projects by me (such as the [IfcEnvelopeExtractor](https://github.com/tudelft3d/IFC_BuildingEnvExtractor)) the single IFCC executable can process all IFC versions.
 
+If fragments export is desired IFCC.exe has to be placed in the same folder as IfcSwap.exe and web-ifc-node.wasm. Sadly due to the libraries used no other reasonable solution could be found.
+
 ## How to build
 
-The code is supplied with a CMakeLists.txt file that will handle all the downloads and dependencies. Cmake can behave slightly feeble and manual configuration might be required.
+The code is supplied with a CMakeLists.txt file that will handle all the C++ related downloads and dependencies. Cmake can behave slightly feeble and manual configuration might be required.
 
 The only 3rd party library IFCC relies on is the [minizip](https://github.com/zlib-ng/minizip-ng) library.
+
+Fragments output is partially supported via IfcSwap. IfcSwap can be build for Windows by running the "BuildIfcSwap.bat" file. [npm](https://www.npmjs.com/) is required for this .bat file to run. IFCC has to have IfcSwap.exe and web-ifc-node.wasm in the same folder to be able to export Fragments files. This pairing can be set automatically during IFCC building by setting -DLINK_IFCSWAP=ON when running cmake.
+
+However, the application also functions without IfcSwap, In that case fragments output will not be possible.
 
 ## Future development
 
@@ -75,7 +81,7 @@ IFCC achieves compression by restructuring an IFC file and removing redundant da
 
 IFCC does also support IFCZIP file output. This combines the processes of IFCC and ZIP for even further file size reductions. An IFCC created IFCZIP file will occupy noticeably less memory than a "normal" IFCZIP files. Some examples can be seen below.
 
-| IFC file name | File size (MB) | Compressed IFCZIP file size (MB) | IFCC compressed IFCZIP file size (MB) |
+| IFC file name | File size (MB) | IFCZIP file size (MB) | IFCC compressed IFCZIP file size (MB) |
 | - | - | - | - |
 | [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 0.415 (16.5%) | 0.366 (14.6%) |
 | [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 1.469 (13.8%) | 0.576 (5.3%) |
@@ -89,11 +95,23 @@ IFCZIP is just a ZIP archive but with a custom .IFCZIP extension. Changing the e
 
 **What is the difference between IFCC processed IFC files and normal Fragments files?**
 
-IFCC achieves compression by restructuring an IFC file and removing redundant data. Converting an IFC file to Fragments reduces the size of an IFC file by changing the encoding. These converted Fragments files do however still contain the redundant data of the original IFC files. Although this is the case the compression achieved by the conversion creates Fragments files that are usually smaller than IFCC processed unzipped IFC files.
+IFCC achieves compression by restructuring an IFC file and removing redundant data. Converting an IFC file to Fragments reduces the size of an IFC file by changing the encoding. These converted Fragments files do however still contain some of the redundant data of the original IFC files. Although this is the case the compression achieved by the conversion still causes Fragments files to be smaller than IFCC processed unzipped IFC files.
+
+IFCC does also partially support Fragment file output. This combines the advantages of both IFCC and Fragments for even further file size reductions. An IFCC created Fragments file will occupy noticeably less memory than a "normal" Fragments files. Some examples can be seen below.
+
+| IFC file name | File size (MB) | Fragments file size (MB) | IFCC compressed Fragments file size (MB) |
+| - | - | - | - |
+| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 0.294 (11.7%) | 0.213 (8.5%) |
+| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 1.891 (17.7%) | 0.808 (7.6%) |
+| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 0.854 (14.3%) | 0.625 (10.5%) |
+| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 5.674 (8.9%) | 2.635 (4.1%) |
+| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 51.438 (15.4%) | 14.760 (4.4%) |
 
 **Does IFCC support Fragments I/O?**
 
-No it does not. The IFC output of IFCC can be fed into a third party IFC2Fragments converter to achieve further compression.
+Only partial Fragments output is supported. Fragments is primarily used effective visual rendering, and so not all the data is transferred in a reversible manner. This means that it does not fit directly in the IFCC philosophy. However, Fragments was requested so often that it has been added if visualization is the main goal.
+
+If normal IFC use is desired it is recommended to store the file as an IFC or IFCZIP file.
 
 **Is compression done with IFCC lossless?**
 
@@ -107,6 +125,10 @@ Almost, but the tool steps trough a couple of processes:
 When storing to IFCZIP:
 
 * Zipping: LossLess
+
+When storing to Fragments:
+
+* File conversion: Lossy
 
 *IFC contains many repeating data objects that can usually be eliminated without the effective loss of data. This process can, in theory, be reversed. However, if objects were linked via their object relationships, so that if one is updated a group of linked objects is also updated with the same change, IFCC compression will break that. This way of linking is however something that is not often done in practice, and I also never encountered aside from theories.
 

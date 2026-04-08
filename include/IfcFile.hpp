@@ -18,8 +18,13 @@ private:
 	/// checks if filesystem path has an IFCZIP extension
 	bool pathIsZip(const std::filesystem::path& filePath);
 
+	bool pathIsFrag(const std::filesystem::path& filePath);
+
 	/// unzippes an IFCZIP file and casts it to ifstream
 	std::istringstream unZip(const std::string& filePaht);
+
+	/// stores a Fragments file and stores it as the outputpath
+	void storeFrag(const std::filesystem::path& outputPath);
 
 	/// Zippes a file and stores it at the outputpath
 	void storeFileZip(const std::filesystem::path& outputPath);

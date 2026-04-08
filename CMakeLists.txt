@@ -5,6 +5,9 @@ include(FetchContent)
 project(IFCC CXX)
 set(CMAKE_CXX_STANDARD 17)
 
+# set
+option(LINK_IFCSWAP "Link IfcSwap executable to support IFCC Fragments output" OFF)
+
 # Fetch minizip
 set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
 set(MZ_ZLIB ON CACHE BOOL "" FORCE)
@@ -46,4 +49,22 @@ target_include_directories(${PROJECT_NAME}
 
 # Link
 target_include_directories(${PROJECT_NAME} PRIVATE )
-target_link_libraries(${PROJECT_NAME} PRIVATE minizip )
+target_link_libraries(${PROJECT_NAME} PRIVATE minizip)
+
+if(LINK_IFCSWAP)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap.exe")
+        message(ERROR "IfcSwap.exe not found. Please run BuildIfcSwap.bat manually.")
+    endif()
+
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap.exe"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/web-ifc-node.wasm"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        COMMENT "Copying IfcSwap.exe to output directory"
+    )
+else()
+    message(STATUS "IfcSwap build disabled")
+endif()

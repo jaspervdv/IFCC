@@ -18,6 +18,14 @@ struct UserSettings {
 	int maxItertation = -1;
 };
 
+bool hasFragSupport() {
+	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("\\IfcSwap.exe");
+
+	if (std::filesystem::exists(IfcSwapPath)) { return true; }
+	return false;
+
+}
+
 bool isValidIfcFile(const std::filesystem::path& filePath, bool isOutputPath = false)
 {
 	if (!isOutputPath)
@@ -28,14 +36,16 @@ bool isValidIfcFile(const std::filesystem::path& filePath, bool isOutputPath = f
 	std::string pathExtension = filePath.extension().string();
 	std::transform(pathExtension.begin(), pathExtension.end(), pathExtension.begin(), ::toupper);
 
-	if (isOutputPath)
+	if (pathExtension == ".FRAG")
 	{
-		if (pathExtension == ".IFCZIP") 
-		{ 
-			return true; 
+		if (hasFragSupport()) { 
+			std::cout << "\n[WARNING] Fragments output will most likely result in the loss of data!\n";
+			return true;
 		}
+		std::cout << "Unable to find IfcSwap.exe to process frag file\n";
+		return false;
 	}
-
+	if (pathExtension == ".IFCZIP") { return true; }
 	if (pathExtension == ".IFC") { return true; }
 	return false;
 }
@@ -53,6 +63,7 @@ void printDefaultstartInfo() {
 void helpOutput() {
 	std::cout << "Usage: IFCC.exe 'IFC/IFCZIP target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
 	std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
+	std::cout << "If IfcSwap is located in the same folder as IFCC it is possible to set the outputpath to .frag.\n";
 	std::cout << "Settings: \n\n";
 	std::cout << "'--deciN'      set decimal size where N = an int for the size \n";
 	std::cout << "'--imaxN'      set iteration cycle max where N = an int for the max iteration cycle \n";
@@ -80,7 +91,7 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	}
 
 	*filePath = std::string(argv[1]);
-	if (!isValidIfcFile(*filePath, true))
+	if (!isValidIfcFile(*filePath, false))
 	{
 		std::cout << "invalid IFC input path\nUse --help for readme\n";
 		return false;
@@ -145,12 +156,10 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	{
 		if (!isValidIfcFile(*outputPath, true))
 		{
-			std::cout << "invalid IFC output path\nUse --help for readme\n";
+			std::cout << "invalid output path\nUse --help for readme\n";
 			return false;
 		}
 	}
-
-
 	return true;
 }
 

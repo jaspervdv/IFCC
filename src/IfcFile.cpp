@@ -25,6 +25,14 @@ bool IfcFile::pathIsZip(const std::filesystem::path& filePath)
 	return false;
 }
 
+bool IfcFile::pathIsFrag(const std::filesystem::path& filePath)
+{
+	std::string pathExtension = filePath.extension().string();
+	std::transform(pathExtension.begin(), pathExtension.end(), pathExtension.begin(), ::toupper);
+	if (pathExtension == ".FRAG") { return true; }
+	return false;
+}
+
 std::istringstream  IfcFile::unZip(const std::string& filepath)
 {
 	void* file_stream = mz_stream_os_create();
@@ -62,6 +70,18 @@ std::istringstream  IfcFile::unZip(const std::string& filepath)
 	std::string content(buffer.begin(), buffer.end());
 	std::istringstream stream(content);
 	return stream;
+}
+
+void IfcFile::storeFrag(const std::filesystem::path& outputPath)
+{
+	std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("\\TempFile.ifc");
+	storeFileIFC(tempPath);
+
+	std::string cmd = "IfcSwap.exe \"" + tempPath.string() + "\" \"" + outputPath.string() + "\"";
+	int result = system(cmd.c_str());
+	std::remove(tempPath.string().c_str());
+
+	return;
 }
 
 void IfcFile::storeFileZip(const std::filesystem::path& outputPath)
@@ -392,7 +412,8 @@ std::string IfcFile::dumptoString() const {
 
 void IfcFile::storeFile(const std::filesystem::path& outputPath)
 {
-	if (pathIsZip(outputPath)) { storeFileZip(outputPath); }
+	if (pathIsFrag(outputPath)) { storeFrag(outputPath); }
+	else if (pathIsZip(outputPath)) { storeFileZip(outputPath); }
 	else { storeFileIFC(outputPath.string()); }
 	return;
 }
