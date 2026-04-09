@@ -47,24 +47,38 @@ IfcClass::IfcClass(int id, const std::string& classType, bool hasGuid, const std
 }
 
 
-std::vector<std::string> IfcClass::tokenizeData(const std::string& delimiters) {
+std::vector<std::string> IfcClass::tokenizeData(const std::string& delimiters)
+{
 	std::vector<std::string> tokens;
 
 	size_t start = 0;
-	size_t pos = 0;
+	bool inQuotes = false;
 
-	while ((pos = data_.find_first_of(delimiters, start)) != std::string::npos)
+	for (size_t i = 0; i < data_.size(); ++i)
 	{
-		if (pos > start)
-			tokens.push_back(data_.substr(start, pos - start));
+		char c = data_[i];
 
-		tokens.push_back(data_.substr(pos, 1));
+		if (c == '\'')
+		{
+			inQuotes = !inQuotes; 
+		}
 
-		start = pos + 1;
+		// Only split if not a string
+		if (!inQuotes && delimiters.find(c) != std::string::npos)
+		{
+			if (i > start)
+				tokens.push_back(data_.substr(start, i - start));
+
+			tokens.push_back(std::string(1, c)); // delimiter as token
+			start = i + 1;
+		}
 	}
 
-	if (start < data_.size()) { tokens.push_back(data_.substr(start)); }
-
+	// Add end
+	if (start < data_.size())
+	{
+		tokens.push_back(data_.substr(start));
+	}
 	return tokens;
 }
 
@@ -98,7 +112,8 @@ void IfcClass::remapClassRelations(const std::map<int, int>& referenceMap)
 			correctedString += currentSubString;
 			continue;
 		}
-		int id = std::stoi(currentSubString.substr(1));
+
+ 		int id = std::stoi(currentSubString.substr(1));
 
 		if (referenceMap.find(id) != referenceMap.end())
 		{

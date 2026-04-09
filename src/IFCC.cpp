@@ -1,5 +1,5 @@
 #define USE_IFC2x3
-#define programVersion "0.5.0"
+#define programVersion "0.6.0"
 
 #include <IfcFile.hpp>
 #include <IfcClass.hpp>
