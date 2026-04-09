@@ -132,6 +132,10 @@ When storing to Fragments:
 
 *IFC contains many repeating data objects that can usually be eliminated without the effective loss of data. This process can, in theory, be reversed. However, if objects were linked via their object relationships, so that if one is updated a group of linked objects is also updated with the same change, IFCC compression will break that. This way of linking is however something that is not often done in practice, and I also never encountered aside from theories.
 
+**Can IfcSwap be used as a standalone application?**
+
+Yes, IfcSwap can be used to convert IFC files to Fragments without any extra compression operations. IfcSwap takes an input path, and output path and an optional compression argument. If as final argument "--c" is given it will compress according to the default settings set by Frags importer. If this argument is not given the Frags importer will be set to preserve all attributes and relations of the input file.
+
 ## References
 
 <a id="1"></a>
