@@ -3,6 +3,8 @@
 
 std::string IfcClass::roundStringFloats(const std::string& theString, int floatLength)
 {
+	if (theString.find('.') == std::string::npos) { return theString; }
+
 	std::stringstream stream;
 	stream << std::fixed << std::setprecision(floatLength) << std::stod(theString);
 

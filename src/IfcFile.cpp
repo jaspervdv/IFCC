@@ -277,7 +277,6 @@ void IfcFile::collapseClasses(int maxIt, int iteration)
 {
 	int counter = 0;
 	int lineCount = getClassCount();
-	std::unordered_set<int> toBeDeletedIndx;
 
 	std::cout << "\n[INFO] collapsing redundant classes, iteration: " << iteration << "\n";
 
@@ -395,6 +394,98 @@ bool IfcFile::recalculateId(bool restructure)
 
 	std::cout << "success" << std::endl;
 	return true;
+}
+
+void IfcFile::removingDangling()
+{
+	std::cout << "\n[INFO] remove dangling structures\n";
+	// graph relationships
+	std::map<int, std::unordered_set<int>> indx2Relation;
+	std::map<int, bool> evalMap;
+
+	int IfcProjectId = -1;
+
+	std::string delimiters = "(),";
+	for (const std::pair<int, IfcClass*> idxClassPair : classStructure_)
+	{
+		int currentIdx = idxClassPair.first;
+		IfcClass* currentClass = idxClassPair.second;
+
+		if (IfcProjectId == -1)
+		{
+			std::string classType = currentClass->getClassType();
+			std::transform(classType.begin(), classType.end(), classType.begin(), ::toupper);
+
+			if (classType == "IFCPROJECT")
+			{
+				IfcProjectId = currentIdx;
+			}
+		}
+
+		std::unordered_set<int> relatedId;
+		if (indx2Relation.find(currentIdx) != indx2Relation.end())
+		{
+			relatedId = indx2Relation[currentIdx];
+		}
+
+		std::vector<std::string> tokenizedString = currentClass->tokenizeData(delimiters);
+		for (const std::string& currentToken : tokenizedString)
+		{
+			if (currentToken.length() == 0) { continue; }
+			if (currentToken[0] != '#') { continue; }
+			int id = std::stoi(currentToken.substr(1));
+			relatedId.insert(id);
+
+			if (indx2Relation.find(id) == indx2Relation.end())
+			{
+				std::unordered_set<int> localId;
+				localId.emplace(currentIdx);
+				indx2Relation.emplace(id, localId);
+			}
+
+			indx2Relation[id].emplace(currentIdx);
+
+		}
+		indx2Relation[currentIdx] = relatedId;
+		evalMap.emplace(currentIdx, false);
+	}
+
+	if (IfcProjectId == -1)
+	{
+		std::cout << "Unable to find IfcProject class\n";
+		return;
+	}
+
+	std::vector<int> IndxPool = { IfcProjectId };
+	while (!IndxPool.empty())
+	{
+		std::vector<int> bufferList;
+
+		for (int currentIdx : IndxPool)
+		{
+			if (evalMap[currentIdx]) { continue; }
+			evalMap[currentIdx] = true;
+
+			for (int t : indx2Relation[currentIdx])
+			{
+				bufferList.emplace_back(t);
+			}		
+		}
+		IndxPool = bufferList;
+	}
+
+	int removedObbCount = 0;
+	for (std::pair<int, bool> currentOcc : evalMap)
+	{
+		if (!currentOcc.second)
+		{
+			removeClass(currentOcc.first);
+			removedObbCount++;
+		}
+	}
+	std::cout << "removed " << removedObbCount << " object(s)\n";
+	std::cout << "success\n";
+	return;
 }
 
 

@@ -1,5 +1,5 @@
 #define USE_IFC2x3
-#define programVersion "0.6.0"
+#define programVersion "0.6.1"
 
 #include <IfcFile.hpp>
 #include <IfcClass.hpp>
@@ -183,8 +183,9 @@ int main(int argc, char* argv[])
 
 	theFile.roundFloats(userSettings.floatPrecision);
 	theFile.collapseClasses(userSettings.maxItertation);
+	theFile.removingDangling();
 	theFile.recalculateId(true);
-
+	
 	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;
 	theFile.storeFile(outputPath.string());
 	std::cout << "[INFO] Exported successfully" << std::endl;

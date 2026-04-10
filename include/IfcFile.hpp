@@ -60,6 +60,8 @@ public:
 	/// recalculate the ID so that the first object is 1 and every net ID is +1 of the one before 
 	bool recalculateId(bool restructure);
 
+	void removingDangling();
+
 	/// output all the IfcFile data to a single string
 	std::string dumptoString() const;
 
