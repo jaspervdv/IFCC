@@ -5,10 +5,12 @@
 
 IFCC is a console application that almost lossless compresses IFC and IFCZIP files. The tool allows both IFC and IFCZIP output. IFCZIP allows for more compression but will use the IFCZIP encoding which might not be supported by all applications. The general processes of the compressor are:
 
-* Rounding of floating number values to 0.000001 meter if their precision is higher (0.000001 meter still smaller than the width of a human hair).
+* Rounding of floating number values to 0.000001 meter if their precision is higher (0.000001 meter is still smaller than the width of a human hair).
 * Eliminating redundant data by merging objects that encode identical data. Objects such as IfcCartesianPoint, IfcDirection, and IfcPropertySingleValue. Any object that has a GUID is not touched. This sub-process is based on the method developed by [(Sun et al., 2016)](#1) but rewritten from scratch
+* Eliminating data that is not (directly or indirectly) related or relating to the main IfcProject object.
 * Restructuring the order in which objects are stored so that the most referenced objects are placed at the beginning of the file. This reduces potential bloating due to large IDs being repeated often in referenced lists of other objects.
 * Recalculating object IDs so that the size of both the class IDs and their references are kept at a minimum.
+* Stripping line breaks.
 
 ![overview](./Images/overview.jpg "An example of the difference between a compressed and uncompressed IFC file")
 
@@ -20,13 +22,13 @@ A visual example of the redundancy removal methodology can be seen below. This m
 
 | IFC file name | File size (MB) | IFCC compressed IFC file size (MB) | IFCC compressed IFCZIP file size (MB)* | IFCC compressed Fragments file size (MB)** |
 | - | - | - | - | - |
-| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 1.682 (67.0%) | 0.366 (14.6%) | 0.213 (8.5%) |
-| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 2.421 (22.7%) | 0.576 (5.3%) | 0.808 (7.6%) |
-| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 2.255 (37.8%) | 0.572 (9.6%) | 0.625 (10.5%) |
-| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 18.548 (29.2%) | 3.685 (5.8%) | 2.635 (4.1%) |
-| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 60.004 (18.0%) | 14.494 (4.3%) | 14.760 (4.4%) |
+| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 1.615 (63.3%) | 0.366 (14.6%) | 0.213 (8.5%) |
+| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 2.363 (22.1%) | 0.575 (5.4%) | 0.808 (7.6%) |
+| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 2.178 (36.5%) | 0.571 (9.6%) | 0.625 (10.5%) |
+| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 18.004 (28.3%) | 3.685 (5.8%) | 2.635 (4.1%) |
+| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 58.661 (17.6%) | 14.461 (4.3%) | 14.760 (4.4%) |
 | | | | | |
-| Average size | 100% | 34% | 7.9% | 7% |
+| Average size | 100% | 33.6% | 7.9% | 7.0% |
 
 *The IFCZIP files are compressed by IFCC and stored in the IFCZIP encoding.
 
@@ -44,7 +46,7 @@ Optionally an output path can be supplied as a second path. If an output path is
 
 The tool also exposes other settings:
 
-* Decimal size:
+* Decimal size of the float values in the file:
   * "--deciN"
   * N is the desired decimal size in the file. E.g. 4 => 0.0001, 6 => 0.000001. The smaller the decimal size the more compression can be achieved at the cost of reduced accuracy
   * Default value = 6
@@ -52,6 +54,8 @@ The tool also exposes other settings:
   * "--imaxN"
   * N is the desired max iteration cycle that the tool is allowed to run. The lower this number the faster the processing at the cost of reduced compression
   * Default value = ∞
+* Keep the line breaks in the file (pretty print):
+  * "--Prty"
 
 Unlike earlier developed IFC related projects by me (such as the [IfcEnvelopeExtractor](https://github.com/tudelft3d/IFC_BuildingEnvExtractor)) the single IFCC executable can process all IFC versions.
 
@@ -119,8 +123,10 @@ Almost, but the tool steps trough a couple of processes:
 
 * Rounding of the float numbers: Lossy
 * Eliminating redundant data: Lossless in most cases*
+* Eliminating unrelated or unrelating data: Lossy*
 * Restructuring of the file: Lossless
 * Recalculating object IDs: Lossless
+* Stripping line breaks: Lossless
 
 When storing to IFCZIP:
 
@@ -131,6 +137,8 @@ When storing to Fragments:
 * File conversion: Lossy
 
 *IFC contains many repeating data objects that can usually be eliminated without the effective loss of data. This process can, in theory, be reversed. However, if objects were linked via their object relationships, so that if one is updated a group of linked objects is also updated with the same change, IFCC compression will break that. This way of linking is however something that is not often done in practice, and I also never encountered aside from theories.
+
+**Dangling data, or data that is not related or ralating to the file's IfcProject object is often unused data. This data can be removed in most cases. However, this deletion cannot be reversed. So, if there was a purpose to add dangling data it can result in loss of data
 
 **Can IfcSwap be used as a standalone application?**
 

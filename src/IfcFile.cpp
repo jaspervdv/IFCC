@@ -157,7 +157,10 @@ IfcFile::IfcFile(const std::string& filePath) {
 	std::string line;
 	while (std::getline(streamFile, line)) {
 		if (line[0] != '#') {
-			if (isHeader) { header_ += line + "\n"; }
+			if (isHeader) { 
+				header_ += line;
+				if (prettyPrint_) { header_ += "\n"; }
+			}
 			else { footer_ += line; }
 			continue;
 		}
@@ -490,11 +493,13 @@ void IfcFile::removingDangling()
 
 
 std::string IfcFile::dumptoString() const {
-	std::string dumpedString = header_ + "\n";
+	std::string dumpedString = header_;
+	if (prettyPrint_) { dumpedString += "\n"; }
 
 	for (const std::pair<int, IfcClass*>& currentPair : classStructure_)
 	{
-		dumpedString += "#" + std::to_string(currentPair.first) + "=" + currentPair.second->getData() + "\n";
+		dumpedString += "#" + std::to_string(currentPair.first) + "=" + currentPair.second->getData();
+		if (prettyPrint_) { dumpedString += "\n"; }
 	}
 	dumpedString += footer_;
 

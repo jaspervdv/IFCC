@@ -16,6 +16,7 @@
 struct UserSettings {
 	int floatPrecision = 6;
 	int maxItertation = -1;
+	bool prettyPrint_ = false;
 };
 
 bool hasFragSupport() {
@@ -67,6 +68,7 @@ void helpOutput() {
 	std::cout << "Settings: \n\n";
 	std::cout << "'--deciN'      set decimal size where N = an int for the size \n";
 	std::cout << "'--imaxN'      set iteration cycle max where N = an int for the max iteration cycle \n";
+	std::cout << "'--prty'		 keep the linebreaks in the output IFC and IFCZIP files \n";
 }
 
 bool isPath(const std::string& currentString) {
@@ -136,8 +138,17 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 				}
 				catch (const std::exception&) { }
 			}
+			if (currentArg.find("--prty") != std::string::npos)
+			{
+				try
+				{
+					userSettings->prettyPrint_ = true;
+					continue;
+				}
+				catch (const std::exception&) {}
+			}
 
-			std::cout << "Item '" << currentArg << "'is not reconized";;
+			std::cout << "Item '" << currentArg << "'is not recognized";;
 			std::cout << "\nUse --help for readme\n";
 			return false;
 		}
@@ -179,6 +190,7 @@ int main(int argc, char* argv[])
 	std::cout << "\n[INFO] read file\n";
 	IfcFile theFile = IfcFile(filePath.string());
 	if (!theFile.isGood()) { return 0; }
+	theFile.setPrettyPrint(userSettings.prettyPrint_);
 	std::cout << "file successfully read\n\n";
 
 	theFile.roundFloats(userSettings.floatPrecision);

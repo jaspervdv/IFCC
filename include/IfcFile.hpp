@@ -14,6 +14,7 @@ private:
 	std::map<int, IfcClass*> classStructure_;
 	std::map<int, std::unique_ptr<IfcClass>> privateClassList_;
 	bool isGood_ = false;
+	bool prettyPrint_ = false;
 
 	/// checks if filesystem path has an IFCZIP extension
 	bool pathIsZip(const std::filesystem::path& filePath);
@@ -41,6 +42,8 @@ public:
 	std::map<int, IfcClass*>::iterator begin() { return classStructure_.begin(); }
 	std::map<int, IfcClass*>::iterator end() { return classStructure_.end(); }
 	int getClassCount() const { return classStructure_.size(); }
+
+	void setPrettyPrint(bool b) { prettyPrint_ = b; }
 
 	/// removes a class at idx from the ifcfile class
 	void removeClass(int idx);
