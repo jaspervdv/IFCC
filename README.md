@@ -10,7 +10,7 @@ IFCC is a console application that almost lossless compresses IFC and IFCZIP fil
 * Eliminating data that is not (directly or indirectly) related or relating to the main IfcProject object.
 * Restructuring the order in which objects are stored so that the most referenced objects are placed at the beginning of the file. This reduces potential bloating due to large IDs being repeated often in referenced lists of other objects.
 * Recalculating object IDs so that the size of both the class IDs and their references are kept at a minimum.
-* Stripping line breaks.
+* Stripping line breaks and whitespaces.
 
 ![overview](./Images/overview.jpg "An example of the difference between a compressed and uncompressed IFC file")
 
@@ -55,7 +55,7 @@ The tool also exposes other settings:
   * N is the desired max iteration cycle that the tool is allowed to run. The lower this number the faster the processing at the cost of reduced compression
   * Default value = ∞
 * Keep the line breaks in the file (pretty print):
-  * "--Prty"
+  * "--prty"
 
 Unlike earlier developed IFC related projects by me (such as the [IfcEnvelopeExtractor](https://github.com/tudelft3d/IFC_BuildingEnvExtractor)) the single IFCC executable can process all IFC versions.
 
@@ -88,10 +88,10 @@ IFCC does also support IFCZIP file output. This combines the processes of IFCC a
 | IFC file name | File size (MB) | IFCZIP file size (MB) | IFCC compressed IFCZIP file size (MB) |
 | - | - | - | - |
 | [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 0.415 (16.5%) | 0.366 (14.6%) |
-| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 1.469 (13.8%) | 0.576 (5.3%) |
-| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 1.097 (18.4%) | 0.572 (9.6%) |
+| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 1.469 (13.8%) | 0.575 (5.4%) |
+| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 1.097 (18.4%) | 0.571 (9.6%) |
 | [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 8.048 (12.7%) | 3.685 (5.8%) |
-| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 52.883 (15.8%) | 14.494 (4.3%) |
+| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 52.883 (15.8%) | 14.461 (4.3%) |
 
 **The application I want to open an IFCZIP file in does not support IFCZIP, what now?**
 
@@ -126,7 +126,7 @@ Almost, but the tool steps trough a couple of processes:
 * Eliminating unrelated or unrelating data: Lossy*
 * Restructuring of the file: Lossless
 * Recalculating object IDs: Lossless
-* Stripping line breaks: Lossless
+* Stripping line breaks and whitespaces: Lossless
 
 When storing to IFCZIP:
 
@@ -138,7 +138,7 @@ When storing to Fragments:
 
 *IFC contains many repeating data objects that can usually be eliminated without the effective loss of data. This process can, in theory, be reversed. However, if objects were linked via their object relationships, so that if one is updated a group of linked objects is also updated with the same change, IFCC compression will break that. This way of linking is however something that is not often done in practice, and I also never encountered aside from theories.
 
-**Dangling data, or data that is not related or ralating to the file's IfcProject object is often unused data. This data can be removed in most cases. However, this deletion cannot be reversed. So, if there was a purpose to add dangling data it can result in loss of data
+**Dangling data, or data that is not related or relating to the file's IfcProject object is often unused data. This data can be removed in most cases. However, this deletion cannot be reversed. So, if there was a purpose to add dangling data it can result in loss of data
 
 **Can IfcSwap be used as a standalone application?**
 

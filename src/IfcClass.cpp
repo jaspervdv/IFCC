@@ -1,6 +1,22 @@
 #include <IfcClass.hpp>
 #include <map>
 
+std::string trimOutsideWhiteSpace(const std::string& str)
+{
+	size_t start = 0;
+	size_t end = str.size();
+
+	// Trim from the left
+	while (start < end &&  str[start] == ' ')
+		++start;
+
+	// Trim from the right
+	while (end > start && str[end - 1] == ' ')
+		--end;
+
+	return str.substr(start, end - start);
+}
+
 std::string IfcClass::roundStringFloats(const std::string& theString, int floatLength)
 {
 	if (theString.find('.') == std::string::npos) { return theString; }
@@ -69,7 +85,10 @@ std::vector<std::string> IfcClass::tokenizeData(const std::string& delimiters)
 		if (!inQuotes && delimiters.find(c) != std::string::npos)
 		{
 			if (i > start)
-				tokens.push_back(data_.substr(start, i - start));
+			{
+				std::string token = data_.substr(start, i - start);
+				tokens.push_back(trimOutsideWhiteSpace(token));
+			}
 
 			tokens.push_back(std::string(1, c)); // delimiter as token
 			start = i + 1;
@@ -79,7 +98,8 @@ std::vector<std::string> IfcClass::tokenizeData(const std::string& delimiters)
 	// Add end
 	if (start < data_.size())
 	{
-		tokens.push_back(data_.substr(start));
+		std::string token = data_.substr(start);
+		tokens.push_back(trimOutsideWhiteSpace(token));
 	}
 	return tokens;
 }

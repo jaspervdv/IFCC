@@ -444,6 +444,7 @@ void IfcFile::removingDangling()
 				std::unordered_set<int> localId;
 				localId.emplace(currentIdx);
 				indx2Relation.emplace(id, localId);
+				continue;
 			}
 
 			indx2Relation[id].emplace(currentIdx);
