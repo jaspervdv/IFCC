@@ -69,10 +69,20 @@ if (getFileExtension(filepathOut).toUpperCase() != "FRAG")
 const ifcBytes = new Uint8Array(fs.readFileSync(filePathIn));
 const importer = new FRAGS.IfcImporter();
 
-importer.wasm = {
-  path: path.join(path.dirname(process.execPath), "\\"),
-  absolute: true
-};
+if (process.platform  == "win32") 
+{ 
+    importer.wasm = {
+    path: path.join(path.dirname(process.execPath), "\\"),
+    absolute: true
+    };
+}
+else
+{
+    importer.wasm = {
+    path: path.join(path.dirname(process.execPath), "/"),
+    absolute: true
+    };
+}
 
 if (isFullRes){
     importer.addAllAttributes();

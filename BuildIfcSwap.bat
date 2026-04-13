@@ -1,5 +1,5 @@
 @echo off
-cd supportApps\IfcSwap
+cd supportApps/IfcSwap
 
 REM installing the dependencies
 echo Installing runtime dependencies...

@@ -11,11 +11,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@thatopen/fragments": "^3.3.7",
+    "@thatopen/fragments": "^3.4.1",
     "web-ifc": "^0.0.77"
   },
   "devDependencies": {
-    "@types/node": "^25.5.2",
+    "@types/node": "^25.6.0",
     "pkg": "^5.8.1",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
