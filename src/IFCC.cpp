@@ -20,8 +20,11 @@ struct UserSettings {
 };
 
 bool hasFragSupport() {
+#ifdef _WIN32
 	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("\\IfcSwap.exe");
-
+#elif __linux__
+	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("\\IfcSwap");
+#endif
 	if (std::filesystem::exists(IfcSwapPath)) { return true; }
 	return false;
 
@@ -43,7 +46,7 @@ bool isValidIfcFile(const std::filesystem::path& filePath, bool isOutputPath = f
 			std::cout << "\n[WARNING] Fragments output will most likely result in the loss of data!\n";
 			return true;
 		}
-		std::cout << "Unable to find IfcSwap.exe to process frag file\n";
+		std::cout << "Unable to find IfcSwap to process frag file\n";
 		return false;
 	}
 	if (pathExtension == ".IFCZIP") { return true; }
@@ -62,7 +65,7 @@ void printDefaultstartInfo() {
 }
 
 void helpOutput() {
-	std::cout << "Usage: IFCC.exe 'IFC/IFCZIP target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
+	std::cout << "Usage: IFCC 'IFC/IFCZIP target path' 'optional IFC output path'\nIf no output filepath is supplied the stem path is used with '_compressed' added\n";
 	std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
 	std::cout << "If IfcSwap is located in the same folder as IFCC it is possible to set the outputpath to .frag.\n";
 	std::cout << "Settings: \n\n";

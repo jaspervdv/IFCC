@@ -76,8 +76,11 @@ void IfcFile::storeFrag(const std::filesystem::path& outputPath)
 {
 	std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("\\TempFile.ifc");
 	storeFileIFC(tempPath);
-
+#ifdef _WIN32
 	std::string cmd = "IfcSwap.exe \"" + tempPath.string() + "\" \"" + outputPath.string() + "\"";
+#elif __linux__
+	std::string cmd = "IfcSwap \"" + tempPath.string() + "\" \"" + outputPath.string() + "\"";
+#endif
 	int result = system(cmd.c_str());
 	std::remove(tempPath.string().c_str());
 
