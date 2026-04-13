@@ -23,7 +23,7 @@ bool hasFragSupport() {
 #ifdef _WIN32
 	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("\\IfcSwap.exe");
 #elif __linux__
-	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("\\IfcSwap");
+	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("/IfcSwap");
 #endif
 	if (std::filesystem::exists(IfcSwapPath)) { return true; }
 	return false;
