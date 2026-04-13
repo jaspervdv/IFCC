@@ -52,19 +52,26 @@ target_include_directories(${PROJECT_NAME} PRIVATE )
 target_link_libraries(${PROJECT_NAME} PRIVATE minizip)
 
 if(LINK_IFCSWAP)
-    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap.exe")
-        message(ERROR "IfcSwap.exe not found. Please run BuildIfcSwap.bat manually.")
+    if(WIN32)
+        set(IfcSwapPath "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap.exe")
+    else()
+        set(IfcSwapPath "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap")
+    endif()
+
+    if(NOT EXISTS "${IfcSwapPath}")
+        message(ERROR "IfcSwap not found. Please run BuildIfcSwap.bat manually.")
     endif()
 
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap.exe"
+            "${IfcSwapPath}"
             $<TARGET_FILE_DIR:${PROJECT_NAME}>
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/web-ifc-node.wasm"
             $<TARGET_FILE_DIR:${PROJECT_NAME}>
-        COMMENT "Copying IfcSwap.exe to output directory"
+        COMMENT "Copying IfcSwap to output directory"
     )
+    message(STATUS "IfcSwap enabled")
 else()
-    message(STATUS "IfcSwap build disabled")
+    message(STATUS "IfcSwap disabled")
 endif()

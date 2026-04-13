@@ -67,7 +67,7 @@ The code is supplied with a CMakeLists.txt file that will handle all the C++ rel
 
 The only 3rd party library IFCC relies on is the [minizip](https://github.com/zlib-ng/minizip-ng) library.
 
-Fragments output is partially supported via IfcSwap. IfcSwap can be build for Windows by running the "BuildIfcSwap.bat" file. [npm](https://www.npmjs.com/) is required for this .bat file to run. IFCC has to have IfcSwap.exe and web-ifc-node.wasm in the same folder to be able to export Fragments files. This pairing can be set automatically during IFCC building by setting -DLINK_IFCSWAP=ON when running cmake.
+Fragments output is partially supported via IfcSwap. IfcSwap can be build by running the "BuildIfcSwap.bat" (for Windows) or "BuildIfcSwap.bat" (for Linux) file. [npm](https://www.npmjs.com/) is required for these files to run. IFCC has to have IfcSwap.exe and web-ifc-node.wasm in the same folder to be able to export Fragments files. This pairing can be set automatically during IFCC building by setting -DLINK_IFCSWAP=ON when running cmake.
 
 However, the application also functions without IfcSwap, In that case fragments output will not be possible.
 

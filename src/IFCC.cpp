@@ -107,7 +107,7 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 			std::string currentArg = std::string(argv[i]);
 
 			// check if it is a valid file format
-			if (currentArg[0] != ' - ' && isPath(currentArg))
+			if (currentArg[0] != '-' && isPath(currentArg))
 			{
 				std::filesystem::path outputPathInput = std::string(argv[i]);
 				if (std::filesystem::exists(outputPathInput.parent_path()))
