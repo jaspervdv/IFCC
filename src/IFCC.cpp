@@ -164,7 +164,17 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	}
 	if (outputPath->string().size() == 0)
 	{
-		*outputPath = filePath->parent_path().string() + "/" + filePath->stem().string() + std::string("_compressed") + filePath->extension().string();
+		std::string parentPath = filePath->parent_path().string();
+
+		if (parentPath.empty())
+		{
+			*outputPath = filePath->stem().string() + std::string("_compressed") + filePath->extension().string();
+		}
+		else
+		{
+			*outputPath = filePath->parent_path().string() + "/" + filePath->stem().string() + std::string("_compressed") + filePath->extension().string();
+		}
+
 	}
 	else
 	{
