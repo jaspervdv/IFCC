@@ -113,11 +113,12 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 			if (currentArg[0] != '-' && isPath(currentArg))
 			{
 				std::filesystem::path outputPathInput = std::string(argv[i]);
-				if (std::filesystem::exists(outputPathInput.parent_path()))
+				if (!outputPathInput.has_parent_path() || std::filesystem::exists(outputPathInput.parent_path()))
 				{
 					*outputPath = outputPathInput;
 					continue;
 				}
+
 				std::cout << "invalid IFC output path\nUse --help for readme\n";
 				return false;
 			}
@@ -164,9 +165,7 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	}
 	if (outputPath->string().size() == 0)
 	{
-		std::string parentPath = filePath->parent_path().string();
-
-		if (parentPath.empty())
+		if (!filePath->has_parent_path())
 		{
 			*outputPath = filePath->stem().string() + std::string("_compressed") + filePath->extension().string();
 		}
