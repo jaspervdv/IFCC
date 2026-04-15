@@ -30,7 +30,7 @@ A visual example of the redundancy removal methodology can be seen below. This m
 | | | | | |
 | Average size | 100% | 33.6% | 7.0% | 7.0% |
 
-*The IFCZIP files are compressed by IFCC and stored in the IFCZIP encoding.
+*The IFCZIP files are IFCC compressed IFC files and stored in the IFCZIP encoding by letting IFCC access 7Zip.
 
 ** The Fragments files are IFCC compressed IFC files stored in the Fragments encoding.
 
