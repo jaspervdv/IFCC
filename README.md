@@ -22,13 +22,13 @@ A visual example of the redundancy removal methodology can be seen below. This m
 
 | IFC file name | File size (MB) | IFCC compressed IFC file size (MB) | IFCC compressed IFCZIP file size (MB)* | IFCC compressed Fragments file size (MB)** |
 | - | - | - | - | - |
-| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 1.615 (63.3%) | 0.366 (14.6%) | 0.213 (8.5%) |
-| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 2.363 (22.1%) | 0.575 (5.4%) | 0.808 (7.6%) |
-| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 2.178 (36.5%) | 0.571 (9.6%) | 0.625 (10.5%) |
-| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 18.004 (28.3%) | 3.685 (5.8%) | 2.635 (4.1%) |
-| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 58.661 (17.6%) | 14.461 (4.3%) | 14.760 (4.4%) |
+| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 1.615 (63.3%) | 0.307 (12.2%) | 0.213 (8.5%) |
+| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 2.363 (22.1%) | 0.539 (5.0%) | 0.808 (7.6%) |
+| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 2.178 (36.5%) | 0.521 (8.7%) | 0.625 (10.5%) |
+| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 18.004 (28.3%) | 3.199 (5.0%) | 2.635 (4.1%) |
+| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 58.661 (17.6%) | 13.218 (4.0%) | 14.760 (4.4%) |
 | | | | | |
-| Average size | 100% | 33.6% | 7.9% | 7.0% |
+| Average size | 100% | 33.6% | 7.0% | 7.0% |
 
 *The IFCZIP files are compressed by IFCC and stored in the IFCZIP encoding.
 
@@ -61,11 +61,13 @@ Unlike earlier developed IFC related projects by me (such as the [IfcEnvelopeExt
 
 If fragments export is desired IFCC.exe has to be placed in the same folder as IfcSwap.exe and web-ifc-node.wasm. Sadly due to the libraries used no other reasonable solution could be found.
 
+If maximal IFCZIP compression is desired it is recommended to have 7zip installed on the system the code is ran on. If 7zip is present the code will use that for the zip compression. If it is unable to find 7zip minizip-ng is used for the compression.
+
 ## How to build
 
 The code is supplied with a CMakeLists.txt file that will handle all the C++ related downloads and dependencies. Cmake can behave slightly feeble and manual configuration might be required.
 
-The only 3rd party library IFCC relies on is the [minizip](https://github.com/zlib-ng/minizip-ng) library.
+The only 3rd party library IFCC relies on is the [minizip-ng](https://github.com/zlib-ng/minizip-ng) library.
 
 Fragments output is partially supported via IfcSwap. IfcSwap can be build by running the "BuildIfcSwap.bat" (for Windows) or "BuildIfcSwap.bat" (for Linux) file. [npm](https://www.npmjs.com/) is required for these files to run. IFCC has to have IfcSwap.exe and web-ifc-node.wasm in the same folder to be able to export Fragments files. This pairing can be set automatically during IFCC building by setting -DLINK_IFCSWAP=ON when running cmake.
 
@@ -87,11 +89,11 @@ IFCC does also support IFCZIP file output. This combines the processes of IFCC a
 
 | IFC file name | File size (MB) | IFCZIP file size (MB) | IFCC compressed IFCZIP file size (MB) |
 | - | - | - | - |
-| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 0.415 (16.5%) | 0.366 (14.6%) |
-| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 1.469 (13.8%) | 0.575 (5.4%) |
-| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 1.097 (18.4%) | 0.571 (9.6%) |
-| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 8.048 (12.7%) | 3.685 (5.8%) |
-| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 52.883 (15.8%) | 14.461 (4.3%) |
+| [FZK Haus](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 2.511 | 0.415 (16.5%) | 0.307 (12.2%) |
+| [Office Building](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 10.679 | 1.469 (13.8%) | 0.539 (5.0%) |
+| [Smiley West](https://www.ifcwiki.org/index.php?title=KIT_IFC_Examples) | 5.967 | 1.097 (18.4%) | 0.521 (8.7%) |
+| [Schependomlaan](https://github.com/jakob-beetz/DataSetSchependomlaan/tree/master) | 63.554 | 8.048 (12.7%) | 3.199 (5.0%) |
+| [Strijp S architectural - BIM bouwkundig](https://github.com/buildingsmart-community/Community-Sample-Test-Files/tree/main/IFC%202.3.0.1%20(IFC%202x3)/SDK%20-%20S1) | 333.941 | 52.883 (15.8%) | 13.218 (4.0%) |
 
 **The application I want to open an IFCZIP file in does not support IFCZIP, what now?**
 
@@ -143,6 +145,10 @@ When storing to Fragments:
 **Can IfcSwap be used as a standalone application?**
 
 Yes, IfcSwap can be used to convert IFC files to Fragments without any extra compression operations. IfcSwap takes an input path, and output path and an optional compression argument. If as final argument "--c" is given it will compress according to the default settings set by Frags importer. If this argument is not given the Frags importer will be set to preserve all attributes and relations of the input file.
+
+**Why does IFCC search for 7-Zip?**
+
+Because IFCC uses [7-Zip](https://7-zip.org/) for zip compression to create IFCZIP files. IFCZIP files created by 7-Zip are significantly smaller than I was able to produce with [minizip-ng](https://github.com/zlib-ng/minizip-ng). If however 7-Zip is not found by the tool it defaults back to zipping using [minizip-ng](https://github.com/zlib-ng/minizip-ng) so using installing 7-Zip is not forced upon you.
 
 ## References
 
