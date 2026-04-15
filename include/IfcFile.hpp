@@ -30,6 +30,9 @@ private:
 	/// Zippes a file and stores it at the outputpath
 	void storeFileZip(const std::filesystem::path& outputPath);
 
+	/// searches for 7Zip and attempts to store it
+	bool storeFile7Zip(const std::filesystem::path& outputPath, const std::filesystem::path& fileName);
+
 	/// stores an IFC file to the outputpath
 	void storeFileIFC(const std::filesystem::path& outputPath);
 

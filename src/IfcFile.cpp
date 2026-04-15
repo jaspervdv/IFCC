@@ -96,6 +96,10 @@ void IfcFile::storeFrag(const std::filesystem::path& outputPath)
 
 void IfcFile::storeFileZip(const std::filesystem::path& outputPath)
 {
+	std::string fileName = outputPath.stem().string() + std::string(".ifc");
+	if (storeFile7Zip(outputPath, fileName)) { return; }
+
+	// if not use this
 	void* file_stream = mz_stream_os_create();
 	if (mz_stream_open(file_stream, outputPath.string().c_str(), MZ_OPEN_MODE_CREATE) != MZ_OK) {
 		std::cerr << "Failed to open zip file\n";
@@ -105,7 +109,6 @@ void IfcFile::storeFileZip(const std::filesystem::path& outputPath)
 	void* zip_handle = mz_zip_create();
 	mz_zip_open(zip_handle, file_stream, MZ_OPEN_MODE_WRITE);
 
-	std::string fileName = outputPath.stem().string() + std::string(".ifc");
 	std::string fileContent = dumptoString();
 	int64_t fileSize = static_cast<int64_t>(fileContent.size());
 
@@ -132,6 +135,49 @@ void IfcFile::storeFileZip(const std::filesystem::path& outputPath)
 	mz_stream_delete(&file_stream);
 
 	return;
+}
+
+bool IfcFile::storeFile7Zip(const std::filesystem::path& outputPath, const std::filesystem::path& fileName)
+{
+#ifdef _WIN32
+	// find if 7zip exists
+	std::string zipperPath = "C:\\Program Files\\7-Zip\\7z.exe";
+	std::cout << "[INFO] searching for 7-Zip at: " + zipperPath << "\n";
+
+	if (std::filesystem::exists(zipperPath)) //if exists use 7z
+	{
+		std::cout << "Found 7-Zip" << "\n\n";
+		if (std::filesystem::exists(outputPath)) { std::filesystem::remove(outputPath); }
+
+		std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("\\") + fileName.string();
+		storeFileIFC(tempPath);
+
+		std::string zipperLine = "\"\"" + zipperPath + "\" a -tzip \"" + outputPath.string() + "\"  \"" + tempPath.string() + "\"\"";
+		system(zipperLine.c_str());
+		std::remove(tempPath.string().c_str());
+
+		return true;
+	}
+#elif __linux__
+	std::cout << "[INFO] searching for 7-Zip \n";
+	std::string zipperPath = "7zz";
+	std::string zipperCom = zipperPath + " > /dev/null 2>&1";
+	if (system(zipperCom.c_str()) == 0) //if exists use 7z
+	{
+		std::cout << "Found 7-Zip" << "\n\n";
+		if (std::filesystem::exists(outputPath)) { std::filesystem::remove(outputPath); }
+
+		std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("/") + fileName.string();
+		storeFileIFC(tempPath);
+		std::string zipperLine = "\"" + zipperPath + "\" a -tzip \"" + outputPath.string() + "\"  \"" + tempPath.string() + "\"";
+		system(zipperLine.c_str());
+		std::remove(tempPath.string().c_str());
+
+		return true;
+	}
+#endif
+	std::cout << "unable to find 7-Zip, minizip-ng is used" << std::endl;
+	return false;
 }
 
 void IfcFile::storeFileIFC(const std::filesystem::path& outputPath)
