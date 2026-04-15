@@ -152,7 +152,7 @@ bool IfcFile::storeFile7Zip(const std::filesystem::path& outputPath, const std::
 		std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("\\") + fileName.string();
 		storeFileIFC(tempPath);
 
-		std::string zipperLine = "\"\"" + zipperPath + "\" a -tzip \"" + outputPath.string() + "\"  \"" + tempPath.string() + "\"\"";
+		std::string zipperLine = "\"\"" + zipperPath + "\" a -tzip -mx=7  -mm=Deflate -mfb=128 -mpass=3 \"" + outputPath.string() + "\"  \"" + tempPath.string() + "\"\"";
 		system(zipperLine.c_str());
 		std::remove(tempPath.string().c_str());
 
@@ -169,7 +169,7 @@ bool IfcFile::storeFile7Zip(const std::filesystem::path& outputPath, const std::
 
 		std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("/") + fileName.string();
 		storeFileIFC(tempPath);
-		std::string zipperLine = "\"" + zipperPath + "\" a -tzip \"" + outputPath.string() + "\"  \"" + tempPath.string() + "\"";
+		std::string zipperLine = "\"" + zipperPath + "\" a -tzip -mx=7  -mm=Deflate -mfb=128 -mpass=3 \"" + outputPath.string() + "\"  \"" + tempPath.string() + "\"";
 		system(zipperLine.c_str());
 		std::remove(tempPath.string().c_str());
 
