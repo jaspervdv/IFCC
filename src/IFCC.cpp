@@ -1,4 +1,4 @@
-#define programVersion "0.6.2"
+#define programVersion "0.6.3"
 
 #include <IfcFile.hpp>
 #include <IfcClass.hpp>
