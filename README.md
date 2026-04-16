@@ -38,6 +38,8 @@ Compression numbers of some publicly available datasets can be seen in the table
 
 Even the size of Strijp S model of 334MB drops well below the 100MB threshold for the online use of [IfcGref](https://ifcgref.bk.tudelft.nl/). This allows user to properly georeference a model without having to build a local build of IfcGref.
 
+![Compression chart](./Images/compressionChart.jpg "Chart covering the compression performance of IFCC processed and non IFCC processed IFC, IFCZIP, and fragments files.")
+
 ## How to use
 
 The pre-compiled windows executable can be downloaded from the [releases page](https://github.com/jaspervdv/IFCC/releases). The executable works as a console application. The minimal input required to run the application is an input path. The input path can belong to an IFC or an IFCZIP file. If only an input path is supplied the tool will run a full compression and store the compressed file at the folder of the input path with the filename being the same except for the addition of "_compressed". This behavior is also shown if an IFC or IFCZIP file is dragged onto the .exe in the folder explorer.
