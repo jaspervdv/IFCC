@@ -30,7 +30,7 @@ A visual example of the redundancy removal methodology can be seen below. This m
 | | | | | |
 | Average size | 100% | 33.6% | 7.0% | 7.0% |
 
-*The IFCZIP files are IFCC compressed IFC files and stored in the IFCZIP encoding by letting IFCC access 7Zip.
+*The IFCZIP files are IFCC compressed IFC files and stored in the IFCZIP encoding by letting IFCC access 7-Zip.
 
 ** The Fragments files are IFCC compressed IFC files stored in the Fragments encoding.
 
@@ -61,7 +61,7 @@ Unlike earlier developed IFC related projects by me (such as the [IfcEnvelopeExt
 
 If fragments export is desired IFCC.exe has to be placed in the same folder as IfcSwap.exe and web-ifc-node.wasm. Sadly due to the libraries used no other reasonable solution could be found.
 
-If maximal IFCZIP compression is desired it is recommended to have 7zip installed on the system the code is ran on. If 7zip is present the code will use that for the zip compression. If it is unable to find 7zip minizip-ng is used for the compression.
+If maximal IFCZIP compression is desired it is recommended to have [7-Zip](https://7-zip.org/) installed on the system the code is ran on. If 7-Zip is present the code will use that for the zip compression. If it is unable to find 7-Zip minizip-ng is used for the compression.
 
 ## How to build
 
@@ -97,7 +97,7 @@ IFCC does also support IFCZIP file output. This combines the processes of IFCC a
 
 **The application I want to open an IFCZIP file in does not support IFCZIP, what now?**
 
-IFCZIP is just a ZIP archive but with a custom .IFCZIP extension. Changing the extension name from .IFCZIP to .ZIP or opening the .IFCZIP file with a file archiver (such as 7ZIP, WinRaR, or WinZip) will allow you to access the unzipped IFC file.
+IFCZIP is just a ZIP archive but with a custom .IFCZIP extension. Changing the extension name from .IFCZIP to .ZIP or opening the .IFCZIP file with a file archiver (such as 7-Zip, WinRaR, or WinZip) will allow you to access the unzipped IFC file.
 
 **What is the difference between IFCC processed IFC files and normal Fragments files?**
 
@@ -148,7 +148,7 @@ Yes, IfcSwap can be used to convert IFC files to Fragments without any extra com
 
 **Why does IFCC search for 7-Zip?**
 
-Because IFCC uses [7-Zip](https://7-zip.org/) for zip compression to create IFCZIP files. IFCZIP files created by 7-Zip are significantly smaller than I was able to produce with [minizip-ng](https://github.com/zlib-ng/minizip-ng). If however 7-Zip is not found by the tool it defaults back to zipping using [minizip-ng](https://github.com/zlib-ng/minizip-ng) so using installing 7-Zip is not forced upon you.
+Because IFCC uses [7-Zip](https://7-zip.org/) for zip compression to create IFCZIP files. IFCZIP files created by 7-Zip are significantly smaller than I was able to produce with [minizip-ng](https://github.com/zlib-ng/minizip-ng). If however 7-Zip is not found by the tool it defaults back to zipping using [minizip-ng](https://github.com/zlib-ng/minizip-ng) so installing 7-Zip is not forced upon you.
 
 ## References
 
