@@ -1,4 +1,4 @@
-#define programVersion "0.6.3"
+#define programVersion "0.6.4"
 
 #include <IfcFile.hpp>
 #include <IfcClass.hpp>
@@ -68,6 +68,7 @@ void helpOutput() {
 	std::cout << "Outputpath can end with .ifc for ifc encoded output and .ifczip for zipped output.\n";
 	std::cout << "If IfcSwap is located in the same folder as IFCC it is possible to set the outputpath to .frag.\n";
 	std::cout << "Settings: \n\n";
+	std::cout << "'--v'			 get IFCC version \n";
 	std::cout << "'--deciN'      set decimal size where N = an int for the size \n";
 	std::cout << "'--imaxN'      set iteration cycle max where N = an int for the max iteration cycle \n";
 	std::cout << "'--prty'		 keep the linebreaks in the output IFC and IFCZIP files \n";
@@ -91,6 +92,12 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 	if (std::string(argv[1]) == "--help")
 	{
 		helpOutput();
+		return false;
+	}
+
+	if (std::string(argv[1]) == "--v")
+	{
+		std::cout << programVersion << "\n";
 		return false;
 	}
 
