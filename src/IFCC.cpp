@@ -194,6 +194,10 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 
 int main(int argc, char* argv[])
 {
+#ifdef __EMSCRIPTEN__
+
+#else
+
 	std::filesystem::path filePath = "";
 	std::filesystem::path outputPath = "";
 
@@ -204,9 +208,11 @@ int main(int argc, char* argv[])
 
 	std::cout << "\nInput path: " << filePath.string() << "\n";
 	std::cout << "Output path: " << outputPath.string() << "\n";
-
 	std::cout << "\n[INFO] read file\n";
 	IfcFile theFile = IfcFile(filePath.string());
+
+#endif //  
+
 	if (!theFile.isGood()) { return 0; }
 	theFile.setPrettyPrint(userSettings.prettyPrint_);
 	std::cout << "file successfully read\n\n";
@@ -216,9 +222,14 @@ int main(int argc, char* argv[])
 	theFile.removingDangling();
 	theFile.recalculateId(true);
 	
+#ifdef __EMSCRIPTEN__
+
+#else
 	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;
 	theFile.storeFile(outputPath.string());
 	std::cout << "[INFO] Exported successfully" << std::endl;
+
+#endif //  
 	return 0;
 }
 

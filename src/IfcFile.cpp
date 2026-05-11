@@ -33,7 +33,7 @@ bool IfcFile::pathIsFrag(const std::filesystem::path& filePath)
 	return false;
 }
 
-std::istringstream  IfcFile::unZip(const std::string& filepath)
+std::string IfcFile::unZip(const std::string& filepath)
 {
 	void* file_stream = mz_stream_os_create();
 	mz_stream_open(file_stream, filepath.c_str(), MZ_OPEN_MODE_READ);
@@ -68,8 +68,7 @@ std::istringstream  IfcFile::unZip(const std::string& filepath)
 	mz_stream_delete(&file_stream);
 
 	std::string content(buffer.begin(), buffer.end());
-	std::istringstream stream(content);
-	return stream;
+	return content;
 }
 
 void IfcFile::storeFrag(const std::filesystem::path& outputPath)
@@ -191,41 +190,90 @@ void IfcFile::storeFileIFC(const std::filesystem::path& outputPath)
 }
 
 
+std::vector<std::string> IfcFile::splitDataString(const std::string& dataString)
+{
+	std::vector<std::string> result;
+	std::string current;
+
+	bool inQuotes = false;
+	for (char c : dataString)
+	{
+		if (c == '\'')
+		{
+			inQuotes = !inQuotes;
+			current += c;
+		}
+		else if (c == ';' && !inQuotes)
+		{
+			result.push_back(current + c);
+			current.clear();
+		}
+
+		else if (c== '\n' && !inQuotes)
+		{
+			result.push_back(current);
+			current.clear();
+		}
+		else
+		{
+			current += c;
+		}
+	}
+
+	result.push_back(current);
+
+	return result;
+}
+
 IfcFile::IfcFile(const std::string& filePath) {
 
-	std::istringstream streamFile;
-	if (pathIsZip(filePath)) { streamFile = unZip(filePath); }
+	std::string dataString;
+	if (pathIsZip(filePath)) { dataString = unZip(filePath); }
 	else 
 	{
 		std::ifstream file(filePath);
-		std::string content((std::istreambuf_iterator<char>(file)),
+		dataString = std::string((std::istreambuf_iterator<char>(file)),
 			std::istreambuf_iterator<char>());
-		streamFile = std::istringstream(content);
 	}
 
-	if (streamFile.peek() == std::char_traits<char>::eof())
+	if (dataString.empty())
 	{
 		std::cout << "unable to read date from file" << std::endl;
 		return;
 	}
 
+	initFromString(dataString);
+	
+	return;
+}
+
+
+void IfcFile::removeClass(int idx) {
+	classStructure_.erase(idx);
+	privateClassList_.erase(idx);
+}
+
+bool IfcFile::initFromString(const std::string& dataString)
+{
+	std::vector<std::string> splitString = splitDataString(dataString);
+
 	bool isHeader = true;
-	std::string line;
-	while (std::getline(streamFile, line)) {
-		if (line[0] != '#') {
-			if (isHeader) { 
-				header_ += line;
+	for (const std::string& currentString : splitString)
+	{
+		if (currentString[0] != '#') {
+			if (isHeader) {
+				header_ += currentString;
 				if (prettyPrint_) { header_ += "\n"; }
 			}
-			else { footer_ += line; }
+			else { footer_ += currentString; }
 			continue;
 		}
 		isHeader = false;
 
-		int splitIndx = line.find_first_of("=");
+		int splitIndx = currentString.find_first_of("=");
 
-		std::string stringId = line.substr(0, splitIndx);
-		std::string stringData = line.substr(splitIndx + 1, line.length());
+		std::string stringId = currentString.substr(0, splitIndx);
+		std::string stringData = currentString.substr(splitIndx + 1, currentString.length());
 		if (stringId.length() <= 1) { continue; }
 		if (stringData.length() <= 0) { continue; }
 		int id = std::stoi(stringId.substr(1));
@@ -249,17 +297,10 @@ IfcFile::IfcFile(const std::string& filePath) {
 		privateClassList_.emplace(id, std::move(uniqueClassPtr));
 	}
 
-	if (classStructure_.size () == privateClassList_.size() != 0)
+	if (classStructure_.size() == privateClassList_.size() != 0)
 	{
 		isGood_ = true;
 	}
-	return;
-}
-
-
-void IfcFile::removeClass(int idx) {
-	classStructure_.erase(idx);
-	privateClassList_.erase(idx);
 }
 
 void IfcFile::restructureFile(const std::map<int, int>& referenceMap) {

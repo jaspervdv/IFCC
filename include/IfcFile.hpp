@@ -22,7 +22,7 @@ private:
 	bool pathIsFrag(const std::filesystem::path& filePath);
 
 	/// unzippes an IFCZIP file and casts it to ifstream
-	std::istringstream unZip(const std::string& filePaht);
+	std::string unZip(const std::string& filePaht);
 
 	/// stores a Fragments file and stores it as the outputpath
 	void storeFrag(const std::filesystem::path& outputPath);
@@ -36,8 +36,12 @@ private:
 	/// stores an IFC file to the outputpath
 	void storeFileIFC(const std::filesystem::path& outputPath);
 
+	/// break the datastring into single IFC data entry points
+	std::vector<std::string> splitDataString(const std::string& dataString);
+
 public:
 
+	IfcFile() {};
 	IfcFile(const std::string& filePath);
 
 	std::string getHeader() const { return header_; }
@@ -47,6 +51,9 @@ public:
 	int getClassCount() const { return classStructure_.size(); }
 
 	void setPrettyPrint(bool b) { prettyPrint_ = b; }
+
+	/// inits the data from a datastring
+	bool initFromString(const std::string& dataString);
 
 	/// removes a class at idx from the ifcfile class
 	void removeClass(int idx);
