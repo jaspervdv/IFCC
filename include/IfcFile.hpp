@@ -1,4 +1,5 @@
-#include <IfcClass.hpp>
+#include "IfcClass.hpp"
+
 #include <string>
 #include <map>
 #include <filesystem>

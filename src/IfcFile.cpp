@@ -1,5 +1,6 @@
-#include <IfcClass.hpp>
-#include <IfcFile.hpp>
+#include "IfcClass.hpp"
+#include "IfcFile.hpp"
+
 #include <string>
 #include <map>
 #include <filesystem>
@@ -75,7 +76,7 @@ void IfcFile::storeFrag(const std::filesystem::path& outputPath)
 {
 #ifdef _WIN32
 	std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("\\TempFile.ifc");
-#elif __linux__
+#elif __linux__  || __EMSCRIPTEN__
 	std::filesystem::path tempPath = std::filesystem::current_path().string() + std::string("/TempFile.ifc");
 #endif
 
@@ -83,7 +84,7 @@ void IfcFile::storeFrag(const std::filesystem::path& outputPath)
 
 #ifdef _WIN32
 	std::string cmd = "IfcSwap.exe \"" + tempPath.string() + "\" \"" + outputPath.string() + "\"";
-#elif __linux__
+#elif __linux__  || __EMSCRIPTEN__
 	std::string cmd = "./IfcSwap \"" + tempPath.string() + "\" \"" + outputPath.string() + "\"";
 	std::cout << cmd << std::endl;
 #endif
@@ -157,7 +158,7 @@ bool IfcFile::storeFile7Zip(const std::filesystem::path& outputPath, const std::
 
 		return true;
 	}
-#elif __linux__
+#elif __linux__ 
 	std::cout << "[INFO] searching for 7-Zip \n";
 	std::string zipperPath = "7zz";
 	std::string zipperCom = zipperPath + " > /dev/null 2>&1";

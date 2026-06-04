@@ -1,7 +1,7 @@
 #define programVersion "0.6.4"
 
-#include <IfcFile.hpp>
-#include <IfcClass.hpp>
+#include "IfcFile.hpp"
+#include "IfcClass.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -21,7 +21,7 @@ struct UserSettings {
 bool hasFragSupport() {
 #ifdef _WIN32
 	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("\\IfcSwap.exe");
-#elif __linux__
+#elif __linux__ || __EMSCRIPTEN__
 	std::filesystem::path IfcSwapPath = std::filesystem::current_path().string() + std::string("/IfcSwap");
 #endif
 	if (std::filesystem::exists(IfcSwapPath)) { return true; }
@@ -194,9 +194,6 @@ bool getUserInput(int argc, char* argv[], std::filesystem::path* filePath, std::
 
 int main(int argc, char* argv[])
 {
-#ifdef __EMSCRIPTEN__
-
-#else
 
 	std::filesystem::path filePath = "";
 	std::filesystem::path outputPath = "";
@@ -211,8 +208,6 @@ int main(int argc, char* argv[])
 	std::cout << "\n[INFO] read file\n";
 	IfcFile theFile = IfcFile(filePath.string());
 
-#endif //  
-
 	if (!theFile.isGood()) { return 0; }
 	theFile.setPrettyPrint(userSettings.prettyPrint_);
 	std::cout << "file successfully read\n\n";
@@ -222,14 +217,10 @@ int main(int argc, char* argv[])
 	theFile.removingDangling();
 	theFile.recalculateId(true);
 	
-#ifdef __EMSCRIPTEN__
-
-#else
 	std::cout << "\n[INFO] Exporting file " << outputPath.string() << std::endl;
 	theFile.storeFile(outputPath.string());
 	std::cout << "[INFO] Exported successfully" << std::endl;
 
-#endif //  
 	return 0;
 }
 

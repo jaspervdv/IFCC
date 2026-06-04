@@ -1,4 +1,5 @@
-#include <IfcClass.hpp>
+#include "IfcClass.hpp"
+
 #include <map>
 
 std::string trimOutsideWhiteSpace(const std::string& str)
