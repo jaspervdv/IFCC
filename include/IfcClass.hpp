@@ -13,7 +13,6 @@ class IfcClass {
 private:
 	int id_;
 	std::string classType_;
-	bool hasGuid_;
 	std::string data_ = "";
 
 	inline static std::string defaultDelimiters_ = "(),";
@@ -27,7 +26,7 @@ private:
 
 public:
 
-	IfcClass(int id, const std::string& classType, bool hasGuid, const std::string& dataString);
+	IfcClass(int id, const std::string& classType, const std::string& dataString);
 
 	/// returns a vector consisting out of all the elements that were split by the delimiters with the delimiters included in the vector
 	std::vector<std::string> tokenizeData(const std::string& delimiters);
@@ -41,10 +40,8 @@ public:
 	int getId() const { return id_; }
 	void setId(int id) { id_ = id; }
 	std::string getClassType() const { return classType_; }
-	bool hasGuid() const { return hasGuid_; }
 	std::string getData() const { return data_; }
 	void setData(const std::string& dataString) { data_ = dataString; }
-
 };
 
 #endif

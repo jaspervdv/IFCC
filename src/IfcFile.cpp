@@ -284,13 +284,10 @@ bool IfcFile::initFromString(const std::string& dataString)
 			stringData = stringData.substr(1);
 		}
 
-		std::pair<std::string, std::string> stringPair(stringData.substr(0, stringData.find_first_of("(")), stringData);
-
 		IfcClass currentClass(
 			id,
 			stringData.substr(0, stringData.find_first_of("(")),
-			false,
-			stringData
+			stringData.substr(stringData.find_first_of("("))
 		);
 
 		std::unique_ptr<IfcClass> uniqueClassPtr = std::make_unique<IfcClass>(currentClass);
@@ -302,6 +299,7 @@ bool IfcFile::initFromString(const std::string& dataString)
 	{
 		isGood_ = true;
 	}
+	return true;
 }
 
 void IfcFile::restructureFile(const std::map<int, int>& referenceMap) {
@@ -422,11 +420,15 @@ void IfcFile::collapseClasses(int maxIt, int iteration)
 		removeClass(remapPair.first);
 	}
 
-	std::map<int, int> IdRefMap;
 	if (!oldNewRefMap.empty() && maxIt != iteration)
 	{
 		std::cout << "reduced objects to from " << counter << " to " << counter - oldNewRefMap.size() << "\n";
 		iteration += 1;
+
+		//clear data
+		oldNewRefMap = {};
+		uniqueItemMap = {};
+
 		collapseClasses(maxIt, iteration);
 	}
 	return;
@@ -597,7 +599,7 @@ std::string IfcFile::dumptoString() const {
 
 	for (const std::pair<int, IfcClass*>& currentPair : classStructure_)
 	{
-		dumpedString += "#" + std::to_string(currentPair.first) + "=" + currentPair.second->getData();
+		dumpedString += "#" + std::to_string(currentPair.first) + "=" + currentPair.second->getClassType() + currentPair.second->getData();
 		if (prettyPrint_) { dumpedString += "\n"; }
 	}
 	dumpedString += footer_;

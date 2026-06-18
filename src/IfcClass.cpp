@@ -57,11 +57,10 @@ bool IfcClass::stringIsNum(const std::string& theString)
 	}
 	return true;
 }
-IfcClass::IfcClass(int id, const std::string& classType, bool hasGuid, const std::string& dataString)
+IfcClass::IfcClass(int id, const std::string& classType, const std::string& dataString)
 {
 	id_ = id;
 	classType_ = classType;
-	hasGuid_ = hasGuid;
 	data_ = dataString;
 }
 
