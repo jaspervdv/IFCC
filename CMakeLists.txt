@@ -52,6 +52,18 @@ target_include_directories(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE )
 target_link_libraries(${PROJECT_NAME} PRIVATE minizip)
 
+if(EMSCRIPTEN)
+    target_link_options(IFCC PRIVATE
+        -sWASM=1
+        -sFORCE_FILESYSTEM=1
+        -sEXPORTED_RUNTIME_METHODS=['FS','callMain']
+        -sASSERTIONS
+        -sINITIAL_MEMORY=256MB
+        -sALLOW_MEMORY_GROWTH=1
+        -sMAXIMUM_MEMORY=523MB
+    )
+endif()
+
 if(LINK_IFCSWAP)
     if(WIN32)
         set(IfcSwapPath "${CMAKE_SOURCE_DIR}/supportApps/IfcSwap/dist/IfcSwap.exe")
