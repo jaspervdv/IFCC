@@ -201,10 +201,8 @@ int main(int argc, char* argv[])
 	printDefaultstartInfo();
 
 	UserSettings userSettings;
-	//if (!getUserInput(argc, argv, &filePath, &outputPath, &userSettings)) { return 0; }
+	if (!getUserInput(argc, argv, &filePath, &outputPath, &userSettings)) { return 0; }
 
-	filePath = "C:\\Users\\Jasper\\Documents\\1_projects\\Models_IFC\\AdvancedProject.ifc";
-	outputPath = "C:\\Users\\Jasper\\Documents\\1_projects\\Models_IFC\\AdvancedProject_compressed_2.ifc";
 	userSettings.prettyPrint_ = true;
 
 	std::cout << "\nInput path: " << filePath.string() << "\n";

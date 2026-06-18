@@ -486,7 +486,7 @@ void IfcFile::removingDangling()
 {
 	std::cout << "\n[INFO] remove dangling structures\n";
 	// graph relationships
-	std::unordered_map<int, std::unordered_set<int>> indx2Relation;
+	std::unordered_map<int, std::vector<int>> indx2Relation;
 	std::unordered_map<int, bool> evalMap;
 
 	int IfcProjectId = -1;
@@ -505,7 +505,7 @@ void IfcFile::removingDangling()
 			}
 		}
 
-		std::unordered_set<int> relatedId;
+		std::vector<int> relatedId;
 		if (indx2Relation.find(currentIdx) != indx2Relation.end())
 		{
 			relatedId = indx2Relation[currentIdx];
@@ -517,17 +517,22 @@ void IfcFile::removingDangling()
 			if (currentToken.length() == 0) { continue; }
 			if (currentToken[0] != '#') { continue; }
 			int id = std::stoi(currentToken.substr(1));
-			relatedId.insert(id);
+
+			auto it = find(relatedId.begin(), relatedId.end(), id);
+			if (it == relatedId.end())
+			{
+				relatedId.emplace_back(id);
+			}
 
 			if (indx2Relation.find(id) == indx2Relation.end())
 			{
-				std::unordered_set<int> localId;
-				localId.emplace(currentIdx);
+				std::vector<int> localId;
+				localId.emplace_back(currentIdx);
 				indx2Relation.emplace(id, localId);
 				continue;
 			}
 
-			indx2Relation[id].emplace(currentIdx);
+			indx2Relation[id].emplace_back(currentIdx);
 
 		}
 		indx2Relation[currentIdx] = relatedId;
