@@ -203,8 +203,6 @@ int main(int argc, char* argv[])
 	UserSettings userSettings;
 	if (!getUserInput(argc, argv, &filePath, &outputPath, &userSettings)) { return 0; }
 
-	userSettings.prettyPrint_ = true;
-
 	std::cout << "\nInput path: " << filePath.string() << "\n";
 	std::cout << "Output path: " << outputPath.string() << "\n";
 	std::cout << "\n[INFO] read file\n";
