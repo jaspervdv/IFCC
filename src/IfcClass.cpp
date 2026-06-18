@@ -57,7 +57,7 @@ bool IfcClass::stringIsNum(const std::string& theString)
 	}
 	return true;
 }
-IfcClass::IfcClass(int id, const std::string& classType, const std::string& dataString)
+IfcClass::IfcClass(int id, int classType, const std::string& dataString)
 {
 	id_ = id;
 	classType_ = classType;
@@ -65,7 +65,7 @@ IfcClass::IfcClass(int id, const std::string& classType, const std::string& data
 }
 
 
-std::vector<std::string> IfcClass::tokenizeData(const std::string& delimiters)
+std::vector<std::string> IfcClass::tokenizeData(const std::string& delimiters) const
 {
 	std::vector<std::string> tokens;
 
@@ -121,7 +121,7 @@ void IfcClass::RoundFloatingValues(int floatLength)
 	return;
 }
 
-void IfcClass::remapClassRelations(const std::map<int, int>& referenceMap)
+void IfcClass::remapClassRelations(const std::unordered_map<int, int>& referenceMap)
 {
 	std::vector<std::string> tokenizedString = tokenizeData(defaultDelimiters_);
 	std::string correctedString = tokenizedString[0];

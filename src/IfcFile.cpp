@@ -191,38 +191,36 @@ void IfcFile::storeFileIFC(const std::filesystem::path& outputPath)
 }
 
 
-std::vector<std::string> IfcFile::splitDataString(const std::string& dataString)
+std::vector<std::string_view> IfcFile::splitDataString(const std::string& dataString)
 {
-	std::vector<std::string> result;
-	std::string current;
+	std::vector<std::string_view> result;
+	size_t start = 0;
 
 	bool inQuotes = false;
-	for (char c : dataString)
+	for (size_t i = 0; i < dataString.size(); ++i)
 	{
+		char c = dataString[i];
+
 		if (c == '\'')
 		{
 			inQuotes = !inQuotes;
-			current += c;
-		}
-		else if (c == ';' && !inQuotes)
-		{
-			result.push_back(current + c);
-			current.clear();
 		}
 
-		else if (c== '\n' && !inQuotes)
+		else if (c == ';' && !inQuotes)
 		{
-			result.push_back(current);
-			current.clear();
+			result.emplace_back(dataString.data() + start, i - start + 1);
+			start = i + 1;
 		}
-		else
+
+		else if (c == '\n' && !inQuotes)
 		{
-			current += c;
+			result.emplace_back(dataString.data() + start, i - start);
+			start = i + 1;
 		}
 	}
 
-	result.push_back(current);
 
+	result.emplace_back(dataString.data() + start, dataString.size() - start);
 	return result;
 }
 
@@ -250,16 +248,16 @@ IfcFile::IfcFile(const std::string& filePath) {
 
 
 void IfcFile::removeClass(int idx) {
-	classStructure_.erase(idx);
 	privateClassList_.erase(idx);
 }
 
 bool IfcFile::initFromString(const std::string& dataString)
 {
-	std::vector<std::string> splitString = splitDataString(dataString);
+	std::vector<std::string_view> splitString = splitDataString(dataString);
+	std::unordered_map<std::string, int> classIndexMap;
 
 	bool isHeader = true;
-	for (const std::string& currentString : splitString)
+	for (const std::string_view& currentString : splitString)
 	{
 		if (currentString[0] != '#') {
 			if (isHeader) {
@@ -273,8 +271,8 @@ bool IfcFile::initFromString(const std::string& dataString)
 
 		int splitIndx = currentString.find_first_of("=");
 
-		std::string stringId = currentString.substr(0, splitIndx);
-		std::string stringData = currentString.substr(splitIndx + 1, currentString.length());
+		std::string stringId = std::string(currentString.substr(0, splitIndx));
+		std::string stringData = std::string(currentString.substr(splitIndx + 1, currentString.length()));
 		if (stringId.length() <= 1) { continue; }
 		if (stringData.length() <= 0) { continue; }
 		int id = std::stoi(stringId.substr(1));
@@ -284,51 +282,46 @@ bool IfcFile::initFromString(const std::string& dataString)
 			stringData = stringData.substr(1);
 		}
 
+		// store the class type
+		std::string classType = stringData.substr(0, stringData.find_first_of("("));
+		auto [it, inserted] = classIndexMap.emplace(classType, classTypes_.size());
+
+		if (inserted) { classTypes_.push_back(classType); }
+
 		IfcClass currentClass(
 			id,
-			stringData.substr(0, stringData.find_first_of("(")),
+			classIndexMap.at(classType),
 			stringData.substr(stringData.find_first_of("("))
 		);
 
-		std::unique_ptr<IfcClass> uniqueClassPtr = std::make_unique<IfcClass>(currentClass);
-		classStructure_.emplace(id, uniqueClassPtr.get());
-		privateClassList_.emplace(id, std::move(uniqueClassPtr));
+		privateClassList_.emplace(id, currentClass);
 	}
 
-	if (classStructure_.size() == privateClassList_.size() != 0)
-	{
-		isGood_ = true;
-	}
+	isGood_ = true;
 	return true;
 }
 
-void IfcFile::restructureFile(const std::map<int, int>& referenceMap) {
+void IfcFile::restructureFile(const std::unordered_map<int, int>& referenceMap) {
 
 	// update the object IDs
-	std::map<int, std::unique_ptr<IfcClass>> newPrivateClassList;
-	std::map<int, IfcClass*> newClassStructure;
+	std::map<int, IfcClass> newPrivateClassList;
 
 	for (const std::pair<int, int>& currentPair : referenceMap)
 	{
 		int oldId = currentPair.first;
 		int newId = currentPair.second;
 
-		std::unique_ptr<IfcClass> currentClass = std::move(privateClassList_[oldId]);
-		currentClass->setId(newId);
-		newClassStructure.emplace(newId, currentClass.get());
-		newPrivateClassList.emplace(newId, std::move(currentClass));
+		IfcClass& currentClass = privateClassList_.at(oldId);
+		currentClass.setId(newId);
+		newPrivateClassList.emplace(newId, currentClass);
 	}
 
 	privateClassList_ = std::move(newPrivateClassList);
-	classStructure_ = newClassStructure;
 
 	// update the reference IDS
-
-
-	for (const std::pair<int, IfcClass*>& currentPair : classStructure_)
+	for (auto& [currentIdx, currentclass] : privateClassList_)
 	{
-		IfcClass* currentClass = currentPair.second;
-		currentClass->remapClassRelations(referenceMap);
+		currentclass.remapClassRelations(referenceMap);
 	}
 
 	return;
@@ -340,15 +333,13 @@ void IfcFile::roundFloats(int floatLength)
 	// open the file as generic file and delete lines ad id
 	for (auto fileIt = begin(); fileIt != end(); ++fileIt)
 	{
-		std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
-		IfcClass* currentClass = currentIdClassPair.second;
-		currentClass->RoundFloatingValues(floatLength);
+		fileIt->second.RoundFloatingValues(floatLength);
 	}
 	std::cout << "success" << std::endl;
 	return;
 }
 
-void IfcFile::updateReference(const std::map<int, int>& referenceMap)
+void IfcFile::updateReference(const std::unordered_map<int, int>& referenceMap)
 {
 	int counter = 0;
 	int totalLineCount = getClassCount();
@@ -361,12 +352,9 @@ void IfcFile::updateReference(const std::map<int, int>& referenceMap)
 		}
 		counter++;
 
-		std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
-		int referenceIdx = currentIdClassPair.first;
+		int referenceIdx = fileIt->first;
 		if (referenceMap.find(referenceIdx) != referenceMap.end()) { continue; }
-
-		IfcClass* referenceClass = currentIdClassPair.second;
-		referenceClass->remapClassRelations(referenceMap);
+		fileIt->second.remapClassRelations(referenceMap);
 	}
 	std::cout << "processing objects: " << counter << " (" << "100%)\n";
 	return;
@@ -379,8 +367,8 @@ void IfcFile::collapseClasses(int maxIt, int iteration)
 
 	std::cout << "\n[INFO] collapsing redundant classes, iteration: " << iteration << "\n";
 
-	std::map<std::string, std::unordered_map<std::string, int>> uniqueItemMap;
-	std::map<int, int> oldNewRefMap;
+	std::unordered_map<int, std::unordered_map<std::string, int>> uniqueItemMap;
+	std::unordered_map<int, int> oldNewRefMap;
 
 	for (auto fileIt = begin(); fileIt != end(); ++fileIt)
 	{
@@ -390,12 +378,11 @@ void IfcFile::collapseClasses(int maxIt, int iteration)
 		}
 		counter++;
 
-		std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
-		int currentId = currentIdClassPair.first;
+		int currentId = fileIt->first;
 
-		IfcClass* currentClass = currentIdClassPair.second;
-		std::string classType = currentClass->getClassType();
-		std::string classData = currentClass->getData();
+		IfcClass& currentClass = fileIt->second;
+		int classType = currentClass.getClassTypeIdx();
+		std::string classData = currentClass.getData();
 
 		if (uniqueItemMap.find(classType) == uniqueItemMap.end())
 		{
@@ -438,7 +425,7 @@ bool IfcFile::recalculateId(bool restructure)
 {
 	std::cout << "\n[INFO] recalcualating Ids\n";
 
-	std::map<int, int> remappedId;
+	std::unordered_map<int, int> remappedId;
 	if (restructure)
 	{
 		std::string delimiters = "(),";
@@ -446,16 +433,13 @@ bool IfcFile::recalculateId(bool restructure)
 
 		for (auto fileIt = begin(); fileIt != end(); ++fileIt)
 		{
-			std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
-			int currentId = currentIdClassPair.first;
+			int currentId = fileIt->first;
 			pairIdOccuranceList[currentId] = 0;
 		}
 
 		for (auto fileIt = begin(); fileIt != end(); ++fileIt)
 		{
-			std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
-
-			std::vector<std::string> tokenizedString = currentIdClassPair.second->tokenizeData(delimiters);
+			std::vector<std::string> tokenizedString = fileIt->second.tokenizeData(delimiters);
 
 			for (const std::string& currentToken : tokenizedString)
 			{
@@ -487,8 +471,7 @@ bool IfcFile::recalculateId(bool restructure)
 		int currentId = 1;
 		for (auto fileIt = begin(); fileIt != end(); ++fileIt)
 		{
-			std::pair<int, IfcClass*> currentIdClassPair = *fileIt;
-			int originId = currentIdClassPair.first;
+			int originId = fileIt->first;
 			remappedId.emplace(originId, currentId);
 			currentId++;
 		}
@@ -503,20 +486,17 @@ void IfcFile::removingDangling()
 {
 	std::cout << "\n[INFO] remove dangling structures\n";
 	// graph relationships
-	std::map<int, std::unordered_set<int>> indx2Relation;
-	std::map<int, bool> evalMap;
+	std::unordered_map<int, std::unordered_set<int>> indx2Relation;
+	std::unordered_map<int, bool> evalMap;
 
 	int IfcProjectId = -1;
 
 	std::string delimiters = "(),";
-	for (const std::pair<int, IfcClass*> idxClassPair : classStructure_)
+	for (const auto& [currentIdx, currentClass] : privateClassList_)
 	{
-		int currentIdx = idxClassPair.first;
-		IfcClass* currentClass = idxClassPair.second;
-
 		if (IfcProjectId == -1)
 		{
-			std::string classType = currentClass->getClassType();
+			std::string classType = classTypes_[currentClass.getClassTypeIdx()];
 			std::transform(classType.begin(), classType.end(), classType.begin(), ::toupper);
 
 			if (classType == "IFCPROJECT")
@@ -531,7 +511,7 @@ void IfcFile::removingDangling()
 			relatedId = indx2Relation[currentIdx];
 		}
 
-		std::vector<std::string> tokenizedString = currentClass->tokenizeData(delimiters);
+		std::vector<std::string> tokenizedString = currentClass.tokenizeData(delimiters);
 		for (const std::string& currentToken : tokenizedString)
 		{
 			if (currentToken.length() == 0) { continue; }
@@ -579,7 +559,7 @@ void IfcFile::removingDangling()
 	}
 
 	int removedObbCount = 0;
-	for (std::pair<int, bool> currentOcc : evalMap)
+	for (const std::pair<int, bool>& currentOcc : evalMap)
 	{
 		if (!currentOcc.second)
 		{
@@ -597,9 +577,9 @@ std::string IfcFile::dumptoString() const {
 	std::string dumpedString = header_;
 	if (prettyPrint_) { dumpedString += "\n"; }
 
-	for (const std::pair<int, IfcClass*>& currentPair : classStructure_)
+	for (const auto& [currentIdx, currentClass] : privateClassList_)
 	{
-		dumpedString += "#" + std::to_string(currentPair.first) + "=" + currentPair.second->getClassType() + currentPair.second->getData();
+		dumpedString += "#" + std::to_string(currentIdx) + "=" + classTypes_[currentClass.getClassTypeIdx()] + currentClass.getData();
 		if (prettyPrint_) { dumpedString += "\n"; }
 	}
 	dumpedString += footer_;

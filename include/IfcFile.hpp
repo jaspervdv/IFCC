@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <filesystem>
+#include <set>
 
 #ifndef IFCFILE_IFCFILE_H
 #define IFCFILE_IFCFILE_H
@@ -12,8 +13,10 @@ class IfcFile {
 private:
 	std::string header_ = "";
 	std::string footer_ = "";
-	std::map<int, IfcClass*> classStructure_;
-	std::map<int, std::unique_ptr<IfcClass>> privateClassList_;
+	std::map<int, IfcClass> privateClassList_;
+
+	std::vector<std::string> classTypes_ = {};
+
 	bool isGood_ = false;
 	bool prettyPrint_ = false;
 
@@ -38,7 +41,7 @@ private:
 	void storeFileIFC(const std::filesystem::path& outputPath);
 
 	/// break the datastring into single IFC data entry points
-	std::vector<std::string> splitDataString(const std::string& dataString);
+	std::vector<std::string_view> splitDataString(const std::string& dataString);
 
 public:
 
@@ -47,9 +50,9 @@ public:
 
 	std::string getHeader() const { return header_; }
 	std::string getFooter() const { return footer_; }
-	std::map<int, IfcClass*>::iterator begin() { return classStructure_.begin(); }
-	std::map<int, IfcClass*>::iterator end() { return classStructure_.end(); }
-	int getClassCount() const { return classStructure_.size(); }
+	std::map<int, IfcClass>::iterator begin() { return privateClassList_.begin(); }
+	std::map<int, IfcClass>::iterator end() { return privateClassList_.end(); }
+	int getClassCount() const { return privateClassList_.size(); }
 
 	void setPrettyPrint(bool b) { prettyPrint_ = b; }
 
@@ -60,13 +63,13 @@ public:
 	void removeClass(int idx);
 
 	/// restructures the file according to the reference<old loc, new loc>
-	void restructureFile(const std::map<int, int>& referenceMap);
+	void restructureFile(const std::unordered_map<int, int>& referenceMap);
 
 	/// founds the floating values that are stored in the file to specified float precision
 	void roundFloats(int floatLength);
 
 	/// update the references according to the reference map <old loc, new loc>
-	void updateReference(const std::map<int, int>& referenceMap);
+	void updateReference(const std::unordered_map<int, int>& referenceMap);
 
 	/// removes redundant classes and updates the references to not be dangling
 	void collapseClasses(int maxIt, int iteration = 1);
