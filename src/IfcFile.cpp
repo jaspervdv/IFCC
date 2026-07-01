@@ -17,6 +17,32 @@
 #include "mz_strm_os.h"
 #include "mz_zip.h"
 
+std::string trimeWhiteSpaces(const std::string& str) {
+
+	bool inQuotes = false;
+	std::string cleanString = "";
+	for (size_t i = 0; i < str.size(); ++i)
+	{
+		char c = str[i];
+
+		if (c == '\'')
+		{
+			inQuotes = !inQuotes;
+		}
+
+		if (inQuotes)
+		{
+			cleanString += c;
+			continue;
+		}
+
+		if (c == '\n') { continue; }
+		if (c == ' ') { continue; }
+		cleanString += c;
+	}
+	return cleanString;
+}
+
 
 bool IfcFile::pathIsZip(const std::filesystem::path& filePath)
 {
@@ -197,22 +223,37 @@ std::vector<std::string_view> IfcFile::splitDataString(const std::string& dataSt
 	size_t start = 0;
 
 	bool inQuotes = false;
+	int inBrackets = 0;
 	for (size_t i = 0; i < dataString.size(); ++i)
 	{
 		char c = dataString[i];
+
+		if (start == i && c == '\n')
+		{
+			start = i + 1;
+			continue;
+		}
 
 		if (c == '\'')
 		{
 			inQuotes = !inQuotes;
 		}
+		else if (c == '(' && !inQuotes)
+		{
+			inBrackets++;
+		}
+		else if (c == ')' && !inQuotes)
+		{
+			inBrackets--;
+		}
 
-		else if (c == ';' && !inQuotes)
+		else if (c == ';' && !inQuotes && inBrackets == 0)
 		{
 			result.emplace_back(dataString.data() + start, i - start + 1);
 			start = i + 1;
 		}
 
-		else if (c == '\n' && !inQuotes)
+		else if (c == '\n' && !inQuotes && inBrackets == 0)
 		{
 			result.emplace_back(dataString.data() + start, i - start);
 			start = i + 1;
@@ -224,7 +265,8 @@ std::vector<std::string_view> IfcFile::splitDataString(const std::string& dataSt
 	return result;
 }
 
-IfcFile::IfcFile(const std::string& filePath) {
+IfcFile::IfcFile(const std::string& filePath, bool prettyPrint) {
+	setPrettyPrint(prettyPrint);
 
 	std::string dataString;
 	if (pathIsZip(filePath)) { dataString = unZip(filePath); }
@@ -291,10 +333,16 @@ bool IfcFile::initFromString(const std::string& dataString)
 		IfcClass currentClass(
 			id,
 			classIndexMap.at(classType),
-			stringData.substr(stringData.find_first_of("("))
+			trimeWhiteSpaces(stringData.substr(stringData.find_first_of("(")))
 		);
 
 		privateClassList_.emplace(id, currentClass);
+	}
+
+	if (!prettyPrint_)
+	{
+		header_ = trimeWhiteSpaces(header_);
+		footer_ = trimeWhiteSpaces(footer_);
 	}
 
 	isGood_ = true;

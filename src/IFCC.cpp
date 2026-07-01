@@ -206,10 +206,9 @@ int main(int argc, char* argv[])
 	std::cout << "\nInput path: " << filePath.string() << "\n";
 	std::cout << "Output path: " << outputPath.string() << "\n";
 	std::cout << "\n[INFO] read file\n";
-	IfcFile theFile = IfcFile(filePath.string());
+	IfcFile theFile = IfcFile(filePath.string(), userSettings.prettyPrint_);
 
 	if (!theFile.isGood()) { return 0; }
-	theFile.setPrettyPrint(userSettings.prettyPrint_);
 	std::cout << "file successfully read\n\n";
 
 	theFile.roundFloats(userSettings.floatPrecision);

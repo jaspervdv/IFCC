@@ -60,7 +60,7 @@ if(EMSCRIPTEN)
         -sASSERTIONS
         -sINITIAL_MEMORY=256MB
         -sALLOW_MEMORY_GROWTH=1
-        -sMAXIMUM_MEMORY=523MB
+        -sMAXIMUM_MEMORY=4GB
     )
 endif()
 

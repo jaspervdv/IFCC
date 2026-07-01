@@ -46,7 +46,7 @@ private:
 public:
 
 	IfcFile() {};
-	IfcFile(const std::string& filePath);
+	IfcFile(const std::string& filePath, bool prettyPrint);
 
 	std::string getHeader() const { return header_; }
 	std::string getFooter() const { return footer_; }
